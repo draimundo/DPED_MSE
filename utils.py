@@ -23,23 +23,23 @@ def process_command_args(arguments):
     dslr_dir = 'fujifilm/'
     phone_dir = 'mediatek_raw/'
     # --- architecture ---
-    arch = "punet"
+    arch = "resnet"
     level = 0
     inst_norm = False
     num_maps_base = 16
     # --- model weights ---
-    restore_iter = 118000
+    restore_iter = None
     # --- input size ---
     patch_w = 256 # default size for MAI dataset
     patch_h = 256 # default size for MAI dataset
     # --- training options ---
-    batch_size = 15
+    batch_size = 32
     train_size = 5000
-    learning_rate = 2e-5
+    learning_rate = 5e-5
     eval_step = 1000
-    num_train_iters = 150000
+    num_train_iters = None
     # --- more options ---
-    save_mid_imgs = True
+    save_mid_imgs = False
 
     for args in arguments:
 
@@ -109,6 +109,8 @@ def process_command_args(arguments):
     # choose architecture
     if arch == "punet":
         name_model = "punet"
+    elif arch == "resnet":
+        name_model = "resnet"
 
     # obtain restore iteration info
     if not os.path.isdir(model_dir):
