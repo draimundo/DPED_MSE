@@ -227,6 +227,8 @@ def process_test_model_args(arguments):
     # choose architecture
     if arch == "punet":
         name_model = "punet"
+    elif arch == "resnet":
+        name_model = "resnet"
 
     # obtain restore iteration info (necessary if no pre-trained model or not random weights)
     if restore_iter is None and not orig_model and not rand_param: # need to restore a model
