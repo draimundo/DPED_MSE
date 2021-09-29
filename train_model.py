@@ -44,7 +44,9 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     # determine model name
     if arch == "punet":
         name_model = "punet"
-    
+    elif arch == "resnet":
+        name_model = "resnet"
+        
     # Placeholders for training data
     phone_ = tf.compat.v1.placeholder(tf.float32, [batch_size, PATCH_HEIGHT, PATCH_WIDTH, 4])
     dslr_ = tf.compat.v1.placeholder(tf.float32, [batch_size, TARGET_HEIGHT, TARGET_WIDTH, TARGET_DEPTH])
