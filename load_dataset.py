@@ -7,6 +7,7 @@ from PIL import Image
 import imageio
 import os
 import numpy as np
+from tqdm import tqdm
 
 
 def extract_bayer_channels(raw):
@@ -39,7 +40,7 @@ def load_val_data(dataset_dir, dslr_dir, phone_dir, PATCH_WIDTH, PATCH_HEIGHT, D
     val_data = np.zeros((NUM_VAL_IMAGES, PATCH_WIDTH, PATCH_HEIGHT, 4))
     val_answ = np.zeros((NUM_VAL_IMAGES, int(PATCH_WIDTH * DSLR_SCALE), int(PATCH_HEIGHT * DSLR_SCALE), 3))
 
-    for i in range(0, NUM_VAL_IMAGES):
+    for i in tqdm(range(0, NUM_VAL_IMAGES)):
 
         I = np.asarray(imageio.imread((val_directory_phone + str(i) + '.png')))
         I = extract_bayer_channels(I)
@@ -71,7 +72,7 @@ def load_train_patch(dataset_dir, dslr_dir, phone_dir, TRAIN_SIZE, PATCH_WIDTH, 
     train_answ = np.zeros((TRAIN_SIZE, int(PATCH_WIDTH * DSLR_SCALE), int(PATCH_HEIGHT * DSLR_SCALE), 3))
 
     i = 0
-    for img in TRAIN_IMAGES:
+    for img in tqdm(TRAIN_IMAGES):
 
         I = np.asarray(imageio.imread((train_directory_phone + str(img) + '.png')))
         I = extract_bayer_channels(I)
