@@ -46,7 +46,6 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
         name_model = "punet"
     elif arch == "resnet":
         name_model = "resnet"
-        
     # Placeholders for training data
     phone_ = tf.compat.v1.placeholder(tf.float32, [batch_size, PATCH_HEIGHT, PATCH_WIDTH, 4])
     dslr_ = tf.compat.v1.placeholder(tf.float32, [batch_size, TARGET_HEIGHT, TARGET_WIDTH, TARGET_DEPTH])
@@ -62,30 +61,28 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     dslr_flat = tf.reshape(dslr_, [-1, TARGET_SIZE])
 
     # MSE loss
-    print(dslr_flat.get_shape())
-    print(enhanced_flat.get_shape())
-    loss_mse = tf.reduce_sum(tf.pow(dslr_flat - enhanced_flat, 2))/(TARGET_SIZE * batch_size)
+    loss_mse = tf.nn.l2_loss(dslr_flat - enhanced_flat, 2))/(TARGET_SIZE * batch_size)
 
     # PSNR loss
     loss_psnr = 20 * utils.log10(1.0 / tf.sqrt(loss_mse))
 
     # SSIM loss
-    #loss_ssim = tf.reduce_mean(tf.image.ssim(enhanced, dslr_, 1.0))
+    loss_ssim = tf.reduce_mean(tf.image.ssim(enhanced, dslr_, 1.0))
 
     # MS-SSIM loss
     #loss_ms_ssim = tf.reduce_mean(tf.image.ssim_multiscale(enhanced, dslr_, 1.0))
 
     # Content loss
-    #CONTENT_LAYER = 'relu5_4'
+    CONTENT_LAYER = 'relu5_4'
 
-    # enhanced_vgg = vgg.net(vgg_dir, vgg.preprocess(enhanced * 255))
-    # dslr_vgg = vgg.net(vgg_dir, vgg.preprocess(dslr_ * 255))
+    enhanced_vgg = vgg.net(vgg_dir, vgg.preprocess(enhanced * 255))
+    dslr_vgg = vgg.net(vgg_dir, vgg.preprocess(dslr_ * 255))
 
-    # content_size = utils._tensor_size(dslr_vgg[CONTENT_LAYER]) * batch_size
-    # loss_content = 2 * tf.nn.l2_loss(enhanced_vgg[CONTENT_LAYER] - dslr_vgg[CONTENT_LAYER]) / content_size
+    content_size = utils._tensor_size(dslr_vgg[CONTENT_LAYER]) * batch_size
+    loss_content = 2 * tf.nn.l2_loss(enhanced_vgg[CONTENT_LAYER] - dslr_vgg[CONTENT_LAYER]) / content_size
 
     # Final loss function
-    loss_generator = loss_mse
+    loss_generator = loss_mse * 200 + loss_content + (1 - loss_ssim) * 20
 
     # Optimize network parameters
     generator_vars = [v for v in tf.compat.v1.global_variables() if v.name.startswith("generator")]
@@ -132,7 +129,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
 
     name_model_save = name_model
     
-    for i in tqdm(range(iter_start, num_train_iters + 1)):
+    for i in tqdm(range(iter_start, num_train_iters + 1), miniters=100):
         name_model_save_full = name_model_save + "_iteration_" + str(i)
 
         # Train model
@@ -176,14 +173,13 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
 
                 val_losses += np.asarray(losses) / num_val_batches
 
-            logs_gen = "generator losses | train: %.4g, test: %.4g\n" % \
-                  (training_loss, val_losses[0][0])
+            logs_gen = "%06g; %.4g; %.4g\n" % \
+                  (i, training_loss, val_losses[0][0])
             print("\n" + logs_gen)
 
             # Save the results to log file
             logs = open(model_dir + "logs_" + str(iter_start) + "-" + str(num_train_iters) + ".txt", "a")
             logs.write(logs_gen)
-            logs.write('\n')
             logs.close()
 
             # Optional: save visual results for several validation image crops
