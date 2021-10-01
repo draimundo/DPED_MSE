@@ -33,11 +33,11 @@ def process_command_args(arguments):
     patch_w = 256 # default size for MAI dataset
     patch_h = 256 # default size for MAI dataset
     # --- training options ---
-    batch_size = 32
+    batch_size = 50
     train_size = 5000
     learning_rate = 5e-5
     eval_step = 1000
-    num_train_iters = None
+    num_train_iters = 200000
     # --- more options ---
     save_mid_imgs = False
 
@@ -272,7 +272,7 @@ def log10(x):
 
 def _tensor_size(tensor):
     from operator import mul
-    return reduce(mul, (d.value for d in tensor.get_shape()[1:]), 1)
+    return reduce(mul, (d for d in tensor.get_shape()[1:]), 1)
 
 
 def export_pb(sess, output_node_name, output_dir='.', export_pb_name='test.pb'):

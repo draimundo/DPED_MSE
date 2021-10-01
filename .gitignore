@@ -1,0 +1,6 @@
+/raw_images
+vgg_pretrained/
+
+models/
+
+__pycache__/
