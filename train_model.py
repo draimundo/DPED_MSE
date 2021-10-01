@@ -157,7 +157,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
         if i % eval_step == 0:
 
             # Evaluate model
-            val_losses = np.zeros((1, 2))
+            val_losses = np.zeros((1, 4))
 
             for j in range(num_val_batches):
 
@@ -168,18 +168,20 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
                 dslr_images = val_answ[be:en]
 
                 [enhanced_crops, losses] = sess.run([enhanced, \
-                                [loss_generator, loss_psnr]], \
+                                [loss_generator, loss_content, loss_mse, loss_ssim]], \
                                 feed_dict={phone_: phone_images, dslr_: dslr_images})
 
                 val_losses += np.asarray(losses) / num_val_batches
 
-            logs_gen = "%06g; %.4g; %.4g\n" % \
-                  (i, training_loss, val_losses[0][0])
-            print("\n" + logs_gen)
+            logs_gen = "step %d | training: %.4g, validation: %.4g | content: %.4g, mse: %.4g, " \
+                           "ssim: %.4g\n" % (i, training_loss, val_losses[0][0], val_losses[0][1],
+                                                val_losses[0][2], val_losses[0][3])
+            print(logs_gen)
 
             # Save the results to log file
             logs = open(model_dir + "logs_" + str(iter_start) + "-" + str(num_train_iters) + ".txt", "a")
             logs.write(logs_gen)
+            logs.write('\n')
             logs.close()
 
             # Optional: save visual results for several validation image crops
