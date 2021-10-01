@@ -61,7 +61,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     dslr_flat = tf.reshape(dslr_, [-1, TARGET_SIZE])
 
     # MSE loss
-    loss_mse = tf.nn.l2_loss(dslr_flat - enhanced_flat)/(TARGET_SIZE * batch_size)
+    loss_mse = 2*tf.nn.l2_loss(dslr_flat - enhanced_flat)/(TARGET_SIZE * batch_size)
 
     # PSNR loss
     loss_psnr = 20 * utils.log10(1.0 / tf.sqrt(loss_mse))

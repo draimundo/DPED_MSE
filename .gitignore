@@ -1,6 +1,9 @@
 /raw_images
+/validation_full_resolution_visual_data
 vgg_pretrained/
 
 models/
 
 __pycache__/
+
+results/

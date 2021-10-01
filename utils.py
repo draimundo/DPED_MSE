@@ -153,14 +153,14 @@ def process_test_model_args(arguments):
     model_dir = 'models/'
     result_dir = 'results/'
     # --- architecture ---
-    arch = "punet"
+    arch = "resnet"
     level = 0
     inst_norm = False
     num_maps_base = 16
     # --- model weights ---
     orig_model = False
     rand_param = False
-    restore_iter = 93000
+    restore_iter = 87000
     # --- input size ---
     img_h = 2976 # default size
     img_w = 3968 # default size

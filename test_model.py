@@ -9,7 +9,7 @@ import sys
 import os
 import rawpy
 
-from model import resnet
+from model import resnet, PUNET
 import utils
 
 from datetime import datetime
@@ -26,17 +26,18 @@ config = tf.compat.v1.ConfigProto(device_count={'GPU': 0}) if not use_gpu else N
 with tf.compat.v1.Session(config=config) as sess:
     time_start = datetime.now()
 
-    # determine model name
-    if arch == "punet":
-        name_model = "punet"
-
     # Placeholders for test data
     x_ = tf.compat.v1.placeholder(tf.float32, [1, IMAGE_HEIGHT//2, IMAGE_WIDTH//2, 4])
 
+    # determine model name
     # generate enhanced image
-    # if arch == "punet":
-    #     enhanced = PUNET(x_, instance_norm=inst_norm, instance_norm_level_1=False, num_maps_base=num_maps_base)
-    enhanced = resnet(x_)
+    if arch == "punet":
+        name_model = "punet"
+        enhanced = PUNET(x_, instance_norm=inst_norm, instance_norm_level_1=False, num_maps_base=num_maps_base)
+    if arch == "resnet":
+        name_model = "resnet"
+        enhanced = resnet(x_)
+
 
     # Determine model weights
     saver = tf.compat.v1.train.Saver()
