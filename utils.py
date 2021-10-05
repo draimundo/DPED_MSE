@@ -113,11 +113,11 @@ def process_command_args(arguments):
             leaky = eval(args.split("=")[1])
 
         if args.startswith("fac_content"):
-            fac_content = int(args.split("=")[1])
+            fac_content = float(args.split("=")[1])
         if args.startswith("fac_mse"):
-            fac_mse = int(args.split("=")[1])
+            fac_mse = float(args.split("=")[1])
         if args.startswith("fac_ssim"):
-            fac_ssim = int(args.split("=")[1])
+            fac_ssim = float(args.split("=")[1])
 
     # choose architecture
     if arch == "punet":
