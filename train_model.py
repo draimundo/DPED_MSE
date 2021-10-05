@@ -21,7 +21,7 @@ from tqdm import tqdm
 dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir,\
     arch, LEVEL, inst_norm, num_maps_base, restore_iter, patch_w, patch_h,\
         batch_size, train_size, learning_rate, eval_step, num_train_iters, save_mid_imgs, \
-        leaky \
+        leaky, fac_content, fac_mse, fac_ssim \
         = utils.process_command_args(sys.argv)
 
 # Defining the size of the input and target image patches
@@ -83,7 +83,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     loss_content = 2 * tf.nn.l2_loss(enhanced_vgg[CONTENT_LAYER] - dslr_vgg[CONTENT_LAYER]) / content_size
 
     # Final loss function
-    loss_generator = loss_mse * 200 + loss_content + (1 - loss_ssim) * 20
+    loss_generator = loss_mse * fac_mse + loss_content * fac_content + (1 - loss_ssim) * fac_ssim
 
     # Optimize network parameters
     generator_vars = [v for v in tf.compat.v1.global_variables() if v.name.startswith("generator")]

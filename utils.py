@@ -40,7 +40,10 @@ def process_command_args(arguments):
     num_train_iters = 200000
     # --- more options ---
     save_mid_imgs = False
-    leaky = False
+    leaky = True
+    fac_content = 1
+    fac_mse = 200
+    fac_ssim = 20
 
     for args in arguments:
 
@@ -109,6 +112,13 @@ def process_command_args(arguments):
         if args.startswith("leaky"):
             leaky = eval(args.split("=")[1])
 
+        if args.startswith("fac_content"):
+            fac_content = int(args.split("=")[1])
+        if args.startswith("fac_mse"):
+            fac_mse = int(args.split("=")[1])
+        if args.startswith("fac_ssim"):
+            fac_ssim = int(args.split("=")[1])
+
     # choose architecture
     if arch == "punet":
         name_model = "punet"
@@ -140,11 +150,12 @@ def process_command_args(arguments):
     print("Path to VGG-19 network: " + vgg_dir)
     print("Path to RGB data from DSLR: " + dslr_dir)
     print("Path to Raw data from phone: " + phone_dir)
+    print("Loss function=" + " content:" + str(fac_content) + " +MSE:" + str(fac_mse) + " +SSIM:" + str(fac_ssim))
 
     return dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir,\
         arch, level, inst_norm, num_maps_base, restore_iter, patch_w, patch_h,\
             batch_size, train_size, learning_rate, eval_step, num_train_iters, save_mid_imgs, \
-                leaky
+                leaky, fac_content, fac_mse, fac_ssim
 
 
 def process_test_model_args(arguments):
