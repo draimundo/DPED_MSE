@@ -6,56 +6,62 @@ import tensorflow as tf
 import numpy as np
 
 
-def resnet(input_image):
+def resnet(input_image, leaky = False):
+    if leaky:
+        def relu(x):
+            return leaky_relu(x)
+    else:
+        def relu(x):
+            return tf.nn.relu(x)
 
     with tf.compat.v1.variable_scope("generator"):
 
         W1 = weight_variable([9, 9, 4, 64], name="W1"); b1 = bias_variable([64], name="b1");
-        c1 = leaky_relu(conv2d(input_image, W1) + b1)
+        c1 = relu(conv2d(input_image, W1) + b1)
 
         # residual 1
 
         W2 = weight_variable([3, 3, 64, 64], name="W2"); b2 = bias_variable([64], name="b2");
-        c2 = leaky_relu(_instance_norm(conv2d(c1, W2) + b2))
+        c2 = relu(_instance_norm(conv2d(c1, W2) + b2))
 
         W3 = weight_variable([3, 3, 64, 64], name="W3"); b3 = bias_variable([64], name="b3");
-        c3 = leaky_relu(_instance_norm(conv2d(c2, W3) + b3)) + c1
+        c3 = relu(_instance_norm(conv2d(c2, W3) + b3)) + c1
 
         # residual 2
 
         W4 = weight_variable([3, 3, 64, 64], name="W4"); b4 = bias_variable([64], name="b4");
-        c4 = leaky_relu(_instance_norm(conv2d(c3, W4) + b4))
+        c4 = relu(_instance_norm(conv2d(c3, W4) + b4))
 
         W5 = weight_variable([3, 3, 64, 64], name="W5"); b5 = bias_variable([64], name="b5");
-        c5 = leaky_relu(_instance_norm(conv2d(c4, W5) + b5)) + c3
+        c5 = relu(_instance_norm(conv2d(c4, W5) + b5)) + c3
 
         # residual 3
 
         W6 = weight_variable([3, 3, 64, 64], name="W6"); b6 = bias_variable([64], name="b6");
-        c6 = leaky_relu(_instance_norm(conv2d(c5, W6) + b6))
+        c6 = relu(_instance_norm(conv2d(c5, W6) + b6))
 
         W7 = weight_variable([3, 3, 64, 64], name="W7"); b7 = bias_variable([64], name="b7");
-        c7 = leaky_relu(_instance_norm(conv2d(c6, W7) + b7)) + c5
+        c7 = relu(_instance_norm(conv2d(c6, W7) + b7)) + c5
 
         # residual 4
 
         W8 = weight_variable([3, 3, 64, 64], name="W8"); b8 = bias_variable([64], name="b8");
-        c8 = leaky_relu(_instance_norm(conv2d(c7, W8) + b8))
+        c8 = relu(_instance_norm(conv2d(c7, W8) + b8))
 
         W9 = weight_variable([3, 3, 64, 64], name="W9"); b9 = bias_variable([64], name="b9");
-        c9 = leaky_relu(_instance_norm(conv2d(c8, W9) + b9)) + c7
+        c9 = relu(_instance_norm(conv2d(c8, W9) + b9)) + c7
 
         # Convolutional
 
         W10 = weight_variable([3, 3, 64, 64], name="W10"); b10 = bias_variable([64], name="b10");
-        c10 = leaky_relu(conv2d(c9, W10) + b10)
+        c10 = relu(conv2d(c9, W10) + b10)
 
         W11 = weight_variable([3, 3, 64, 64], name="W11"); b11 = bias_variable([64], name="b11");
-        c11 = leaky_relu(conv2d(c10, W11) + b11)
+        c11 = relu(conv2d(c10, W11) + b11)
 
         # Transposed convolution
 
-        c12 = _conv_tranpose_layer(c11, 64, 3, 2)
+        c12 = _conv_tranpose_layer(c11, 64, 3, 2, leaky)
 
         # Final
 
@@ -233,7 +239,7 @@ def _conv_init_vars(net, out_channels, filter_size, transpose=False):
     return weights_init
 
 
-def _conv_tranpose_layer(net, num_filters, filter_size, strides):
+def _conv_tranpose_layer(net, num_filters, filter_size, strides, leaky = False):
     weights_init = _conv_init_vars(net, num_filters, filter_size, transpose=True)
 
     batch_size, rows, cols, in_channels = [i for i in net.get_shape()]
@@ -245,7 +251,10 @@ def _conv_tranpose_layer(net, num_filters, filter_size, strides):
     strides_shape = [1, strides, strides, 1]
     net = tf.nn.conv2d_transpose(net, weights_init, tf_shape, strides_shape, padding='SAME')
 
-    return tf.compat.v1.nn.leaky_relu(net)
+    if leaky:
+        return tf.compat.v1.nn.leaky_relu(net)
+    else:
+        return tf.compat.v1.nn.relu(net)
 
 
 def max_pool(x, n):

@@ -28,18 +28,19 @@ def process_command_args(arguments):
     inst_norm = False
     num_maps_base = 16
     # --- model weights ---
-    restore_iter = None
+    restore_iter = 0
     # --- input size ---
     patch_w = 256 # default size for MAI dataset
     patch_h = 256 # default size for MAI dataset
     # --- training options ---
-    batch_size = 50
+    batch_size = 32
     train_size = 5000
     learning_rate = 5e-5
     eval_step = 1000
     num_train_iters = 200000
     # --- more options ---
     save_mid_imgs = False
+    leaky = False
 
     for args in arguments:
 
@@ -105,6 +106,8 @@ def process_command_args(arguments):
         # --- more options ---
         if args.startswith("save_mid_imgs"):
             save_mid_imgs = eval(args.split("=")[1])
+        if args.startswith("leaky"):
+            leaky = eval(args.split("=")[1])
 
     # choose architecture
     if arch == "punet":
@@ -140,7 +143,8 @@ def process_command_args(arguments):
 
     return dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir,\
         arch, level, inst_norm, num_maps_base, restore_iter, patch_w, patch_h,\
-            batch_size, train_size, learning_rate, eval_step, num_train_iters, save_mid_imgs
+            batch_size, train_size, learning_rate, eval_step, num_train_iters, save_mid_imgs, \
+                leaky
 
 
 def process_test_model_args(arguments):
@@ -160,7 +164,7 @@ def process_test_model_args(arguments):
     # --- model weights ---
     orig_model = False
     rand_param = False
-    restore_iter = 87000
+    restore_iter = 0
     # --- input size ---
     img_h = 2976 # default size
     img_w = 3968 # default size

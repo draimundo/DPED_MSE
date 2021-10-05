@@ -20,8 +20,9 @@ from tqdm import tqdm
 # Processing command arguments
 dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir,\
     arch, LEVEL, inst_norm, num_maps_base, restore_iter, patch_w, patch_h,\
-        batch_size, train_size, learning_rate, eval_step, num_train_iters, save_mid_imgs = \
-            utils.process_command_args(sys.argv)
+        batch_size, train_size, learning_rate, eval_step, num_train_iters, save_mid_imgs, \
+        leaky \
+        = utils.process_command_args(sys.argv)
 
 # Defining the size of the input and target image patches
 PATCH_WIDTH = patch_w//2
@@ -54,7 +55,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     if arch == "punet":
         enhanced = PUNET(phone_, instance_norm=inst_norm, instance_norm_level_1=False, num_maps_base=num_maps_base)
     elif arch == "resnet":
-        enhanced = resnet(phone_)
+        enhanced = resnet(phone_, leaky)
 
     # Losses
     enhanced_flat = tf.reshape(enhanced, [-1, TARGET_SIZE])
