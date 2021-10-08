@@ -61,11 +61,26 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     enhanced_flat = tf.reshape(enhanced, [-1, TARGET_SIZE])
     dslr_flat = tf.reshape(dslr_, [-1, TARGET_SIZE])
 
+    # texture (adversarial) loss
+    # discrim_target = tf.concat([adv_, 1 - adv_], 1)
+    # loss_discrim = -tf.reduce_sum(discrim_target * tf.compat.v1.log(tf.clip_by_value(discrim_predictions, 1e-10, 1.0)))
+    # loss_texture = -loss_discrim
+
+    # correct_predictions = tf.equal(tf.argmax(discrim_predictions, 1), tf.argmax(discrim_target, 1))
+    # discim_accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32))
+
+    # color loss
+
+    # enhanced_blur = utils.blur(enhanced)
+    # dslr_blur = utils.blur(dslr_image)
+
+    # loss_color = tf.reduce_sum(tf.pow(dslr_blur - enhanced_blur, 2))/(2 * batch_size)
+
     # MSE loss
     loss_mse = 2*tf.nn.l2_loss(dslr_flat - enhanced_flat)/(TARGET_SIZE * batch_size)
 
     # PSNR loss
-    loss_psnr = 20 * utils.log10(1.0 / tf.sqrt(loss_mse))
+    loss_psnr = tf.reduce_mean(tf.image.psnr(enhanced, dslr_, 1.0))
 
     # SSIM loss
     loss_ssim = tf.reduce_mean(tf.image.ssim(enhanced, dslr_, 1.0))
