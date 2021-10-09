@@ -9,7 +9,7 @@ import sys
 import os
 import rawpy
 
-from model import resnet, PUNET
+from model import resnet
 import utils
 
 from datetime import datetime
@@ -31,9 +31,6 @@ with tf.compat.v1.Session(config=config) as sess:
 
     # determine model name
     # generate enhanced image
-    if arch == "punet":
-        name_model = "punet"
-        enhanced = PUNET(x_, instance_norm=inst_norm, instance_norm_level_1=False, num_maps_base=num_maps_base)
     if arch == "resnet":
         name_model = "resnet"
         enhanced = resnet(x_)

@@ -53,6 +53,35 @@ def load_val_data(dataset_dir, dslr_dir, phone_dir, PATCH_WIDTH, PATCH_HEIGHT, D
 
     return val_data, val_answ
 
+def load_test_data(dataset_dir, dslr_dir, phone_dir, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE):
+
+    test_directory_dslr = dataset_dir + 'test/' + dslr_dir
+    test_directory_phone = dataset_dir + 'test/' + phone_dir
+
+
+    # get the image format (e.g. 'png')
+    format_dslr = str.split(os.listdir(test_directory_dslr)[0],'.')[-1]
+
+    # determine test image numbers by listing all files in the folder
+    NUM_TEST_IMAGES = len([name for name in os.listdir(test_directory_phone)
+                           if os.path.isfile(os.path.join(test_directory_phone, name))])
+
+    test_data = np.zeros((NUM_TEST_IMAGES, PATCH_WIDTH, PATCH_HEIGHT, 4))
+    test_answ = np.zeros((NUM_TEST_IMAGES, int(PATCH_WIDTH * DSLR_SCALE), int(PATCH_HEIGHT * DSLR_SCALE), 3))
+
+    for i in tqdm(range(0, NUM_TEST_IMAGES), miniters=100):
+
+        I = np.asarray(imageio.imread((test_directory_phone + str(i) + '.png')))
+        I = extract_bayer_channels(I)
+        test_data[i, :] = I
+
+        I = Image.open(test_directory_dslr + str(i) + '.' + format_dslr)
+        I = np.array(I.resize((int(I.size[0] * DSLR_SCALE / 2), int(I.size[1] * DSLR_SCALE / 2)), resample=Image.BICUBIC))
+        I = np.float16(np.reshape(I, [1, int(PATCH_WIDTH * DSLR_SCALE), int(PATCH_HEIGHT * DSLR_SCALE), 3])) / 255
+        test_answ[i, :] = I
+
+    return test_data, test_answ
+
 
 def load_train_patch(dataset_dir, dslr_dir, phone_dir, TRAIN_SIZE, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE):
 

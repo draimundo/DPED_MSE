@@ -6,67 +6,27 @@ import tensorflow as tf
 import numpy as np
 
 
-def resnet(input_image, leaky = False):
-    if leaky:
-        def relu(x):
-            return leaky_relu(x)
-    else:
-        def relu(x):
-            return tf.nn.relu(x)
-
+def resnet(input_image, leaky = True, instance_norm = True):
     with tf.compat.v1.variable_scope("generator"):
+        
+        conv1 = _conv_layer(input_image, 64, 9, 1, batch_nn = False, leaky = leaky)
 
-        W1 = weight_variable([9, 9, 4, 64], name="W1"); b1 = bias_variable([64], name="b1");
-        c1 = relu(conv2d(input_image, W1) + b1)
+        conv_b1a = _conv_layer(conv1, 64, 3, 1, instance_norm = instance_norm, leaky = leaky)
+        conv_b1b = _conv_layer(convb1a, 64, 3, 1, instance_norm = instance_norm, leaky = leaky) + conv1
 
-        # residual 1
+        conv_b2a = _conv_layer(conv_b1b, 64, 3, 1, instance_norm = instance_norm, leaky = leaky)
+        conv_b2b = _conv_layer(conv_b2a, 64, 3, 1, instance_norm = instance_norm, leaky = leaky) + conv_b1b
 
-        W2 = weight_variable([3, 3, 64, 64], name="W2"); b2 = bias_variable([64], name="b2");
-        c2 = relu(_instance_norm(conv2d(c1, W2) + b2))
+        conv_b3a = _conv_layer(conv_b2b, 64, 3, 1, instance_norm = instance_norm, leaky = leaky)
+        conv_b3b = _conv_layer(conv_b3a, 64, 3, 1, instance_norm = instance_norm, leaky = leaky) + conv_b2b
 
-        W3 = weight_variable([3, 3, 64, 64], name="W3"); b3 = bias_variable([64], name="b3");
-        c3 = relu(_instance_norm(conv2d(c2, W3) + b3)) + c1
+        conv_b4a = _conv_layer(conv_b3b, 64, 3, 1, instance_norm = instance_norm, leaky = leaky)
+        conv_b4b = _conv_layer(conv_b4a, 64, 3, 1, instance_norm = instance_norm, leaky = leaky) + conv_b3b
 
-        # residual 2
-
-        W4 = weight_variable([3, 3, 64, 64], name="W4"); b4 = bias_variable([64], name="b4");
-        c4 = relu(_instance_norm(conv2d(c3, W4) + b4))
-
-        W5 = weight_variable([3, 3, 64, 64], name="W5"); b5 = bias_variable([64], name="b5");
-        c5 = relu(_instance_norm(conv2d(c4, W5) + b5)) + c3
-
-        # residual 3
-
-        W6 = weight_variable([3, 3, 64, 64], name="W6"); b6 = bias_variable([64], name="b6");
-        c6 = relu(_instance_norm(conv2d(c5, W6) + b6))
-
-        W7 = weight_variable([3, 3, 64, 64], name="W7"); b7 = bias_variable([64], name="b7");
-        c7 = relu(_instance_norm(conv2d(c6, W7) + b7)) + c5
-
-        # residual 4
-
-        W8 = weight_variable([3, 3, 64, 64], name="W8"); b8 = bias_variable([64], name="b8");
-        c8 = relu(_instance_norm(conv2d(c7, W8) + b8))
-
-        W9 = weight_variable([3, 3, 64, 64], name="W9"); b9 = bias_variable([64], name="b9");
-        c9 = relu(_instance_norm(conv2d(c8, W9) + b9)) + c7
-
-        # Convolutional
-
-        W10 = weight_variable([3, 3, 64, 64], name="W10"); b10 = bias_variable([64], name="b10");
-        c10 = relu(conv2d(c9, W10) + b10)
-
-        W11 = weight_variable([3, 3, 64, 64], name="W11"); b11 = bias_variable([64], name="b11");
-        c11 = relu(conv2d(c10, W11) + b11)
-
-        # Transposed convolution
-
-        c12 = _conv_tranpose_layer(c11, 64, 3, 2, leaky)
-
-        # Final
-
-        W13 = weight_variable([9, 9, 64, 3], name="W13"); b13 = bias_variable([3], name="b13");
-        enhanced = tf.nn.tanh(conv2d(c12, W13) + b13) * 0.58 + 0.5
+        conv2 = _conv_layer(conv_b4b, 64, 3, 1, instance_norm = False, leaky = leaky)
+        conv3 = _conv_layer(conv2, 64, 3, 1, instance_norm = False, leaky = leaky)
+        tconv1 = _conv_tranpose_layer(conv3, 64, 3, 2, leaky = leaky)
+        enhanced = tf.nn.tanh(_conv_layer(tconv1, 64, 9, 1, relu = False, instance_norm = False) * 0.58 + 0.5
 
     return enhanced
 
@@ -94,76 +54,6 @@ def adversarial(image_):
         adv_out = tf.nn.softmax(tf.matmul(fc, W_out) + bias_out)
     
     return adv_out
-
-
-def PUNET(input, instance_norm=False, instance_norm_level_1=False, num_maps_base=16):
-
-    with tf.compat.v1.variable_scope("generator"):
-
-        # -----------------------------------------
-        # Downsampling layers
-        conv_l1_d1 = _conv_multi_block(input, 3, num_maps=num_maps_base, instance_norm=False)              # 128 -> 128
-        pool1 = max_pool(conv_l1_d1, 2)                                                         # 128 -> 64
-
-        conv_l2_d1 = _conv_multi_block(pool1, 3, num_maps=num_maps_base*2, instance_norm=instance_norm)      # 64 -> 64
-        pool2 = max_pool(conv_l2_d1, 2)                                                         # 64 -> 32
-
-        conv_l3_d1 = _conv_multi_block(pool2, 3, num_maps=num_maps_base*4, instance_norm=instance_norm)     # 32 -> 32
-        pool3 = max_pool(conv_l3_d1, 2)                                                         # 32 -> 16
-
-        conv_l4_d1 = _conv_multi_block(pool3, 3, num_maps=num_maps_base*8, instance_norm=instance_norm)     # 16 -> 16
-        pool4 = max_pool(conv_l4_d1, 2)                                                         # 16 -> 8
-
-        # -----------------------------------------
-        # Processing: Level 5,  Input size: 8 x 8
-        conv_l5_d1 = _conv_multi_block(pool4, 3, num_maps=num_maps_base*16, instance_norm=instance_norm)
-        conv_l5_d2 = _conv_multi_block(conv_l5_d1, 3, num_maps=num_maps_base*16, instance_norm=instance_norm) + conv_l5_d1
-        conv_l5_d3 = _conv_multi_block(conv_l5_d2, 3, num_maps=num_maps_base*16, instance_norm=instance_norm) + conv_l5_d2
-        conv_l5_d4 = _conv_multi_block(conv_l5_d3, 3, num_maps=num_maps_base*16, instance_norm=instance_norm)
-
-        conv_t4b = _conv_tranpose_layer(conv_l5_d4, num_maps_base*8, 3, 2)      # 8 -> 16
-
-        # -----------------------------------------
-        # Processing: Level 4,  Input size: 16 x 16
-        conv_l4_d6 = conv_l4_d1
-        conv_l4_d7 = stack(conv_l4_d6, conv_t4b)
-        conv_l4_d8 = _conv_multi_block(conv_l4_d7, 3, num_maps=num_maps_base*8, instance_norm=instance_norm)
-
-        conv_t3b = _conv_tranpose_layer(conv_l4_d8, num_maps_base*4, 3, 2)      # 16 -> 32
-
-        # -----------------------------------------
-        # Processing: Level 3,  Input size: 32 x 32
-        conv_l3_d6 = conv_l3_d1
-        conv_l3_d7 = stack(conv_l3_d6, conv_t3b)
-        conv_l3_d8 = _conv_multi_block(conv_l3_d7, 3, num_maps=num_maps_base*4, instance_norm=instance_norm)
-
-        conv_t2b = _conv_tranpose_layer(conv_l3_d8, num_maps_base*2, 3, 2)       # 32 -> 64
-
-        # -------------------------------------------
-        # Processing: Level 2,  Input size: 64 x 64
-        conv_l2_d7 = conv_l2_d1
-        conv_l2_d8 = stack(_conv_multi_block(conv_l2_d7, 3, num_maps=num_maps_base*2, instance_norm=instance_norm), conv_t2b)
-        conv_l2_d9 = _conv_multi_block(conv_l2_d8, 3, num_maps=num_maps_base*2, instance_norm=instance_norm)
-
-        conv_t1b = _conv_tranpose_layer(conv_l2_d9, num_maps_base, 3, 2)       # 64 -> 128
-
-        # -------------------------------------------
-        # Processing: Level 1,  Input size: 128 x 128
-        conv_l1_d9 = conv_l1_d1
-        conv_l1_d10 = stack(_conv_multi_block(conv_l1_d9, 3, num_maps=num_maps_base, instance_norm=False), conv_t1b)
-        conv_l1_d11 = stack(conv_l1_d10, conv_l1_d1)
-        conv_l1_d12 = _conv_multi_block(conv_l1_d11, 3, num_maps=num_maps_base, instance_norm=False)
-
-        # ----------------------------------------------------------
-        # Processing: Level 0 (x2 upscaling),  Input size: 128 x 128
-        conv_l0 = _conv_tranpose_layer(conv_l1_d12, num_maps_base//4, 3, 2)        # 128 -> 256
-        conv_l0_out = _conv_layer(conv_l0, 3, 3, 1, relu=False, instance_norm=False)
-
-        output_l0 = tf.nn.tanh(conv_l0_out) * 0.58 + 0.5
-        
-    output_l0 = tf.identity(output_l0, name='output_l0')
-
-    return output_l0
 
 
 def weight_variable(shape, name):
@@ -219,7 +109,7 @@ def conv2d(x, W):
     return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
 
 
-def _conv_layer(net, num_filters, filter_size, strides, relu=True, instance_norm=False, padding='SAME'):
+def _conv_layer(net, num_filters, filter_size, strides, relu=True, instance_norm=False, padding='SAME', leaky = True):
 
     weights_init = _conv_init_vars(net, num_filters, filter_size)
     strides_shape = [1, strides, strides, 1]
@@ -231,7 +121,10 @@ def _conv_layer(net, num_filters, filter_size, strides, relu=True, instance_norm
         net = _instance_norm(net)
 
     if relu:
-        net = tf.compat.v1.nn.leaky_relu(net)
+        if leaky:
+            net = tf.compat.v1.nn.leaky_relu(net)
+        else
+            net = tf.compat.v1.nn.relu(net)
 
     return net
 
@@ -264,7 +157,7 @@ def _conv_init_vars(net, out_channels, filter_size, transpose=False):
     return weights_init
 
 
-def _conv_tranpose_layer(net, num_filters, filter_size, strides, leaky = False):
+def _conv_tranpose_layer(net, num_filters, filter_size, strides, leaky = True):
     weights_init = _conv_init_vars(net, num_filters, filter_size, transpose=True)
 
     batch_size, rows, cols, in_channels = [i for i in net.get_shape()]

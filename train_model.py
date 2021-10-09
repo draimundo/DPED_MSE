@@ -10,7 +10,7 @@ import sys
 from datetime import datetime
 
 from load_dataset import load_train_patch, load_val_data
-from model import PUNET, resnet
+from model import resnet, adversarial
 import utils
 import vgg
 
@@ -42,20 +42,25 @@ np.random.seed(0)
 with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     time_start = datetime.now()
 
-    # determine model name
-    if arch == "punet":
-        name_model = "punet"
-    elif arch == "resnet":
-        name_model = "resnet"
     # Placeholders for training data
     phone_ = tf.compat.v1.placeholder(tf.float32, [batch_size, PATCH_HEIGHT, PATCH_WIDTH, 4])
     dslr_ = tf.compat.v1.placeholder(tf.float32, [batch_size, TARGET_HEIGHT, TARGET_WIDTH, TARGET_DEPTH])
 
+    # determine model name
     # Get the processed enhanced image
-    if arch == "punet":
-        enhanced = PUNET(phone_, instance_norm=inst_norm, instance_norm_level_1=False, num_maps_base=num_maps_base)
-    elif arch == "resnet":
+
+    if arch == "resnet":
+        name_model = "resnet"
         enhanced = resnet(phone_, leaky)
+
+    # push randomly the enhanced or dslr image to an adversarial CNN-discriminator
+    # enhanced_gray = tf.reshape(tf.image.rgb_to_grayscale(enhanced), [-1, PATCH_WIDTH * PATCH_HEIGHT])
+    # dslr_gray = tf.reshape(tf.image.rgb_to_grayscale(dslr_image),[-1, PATCH_WIDTH * PATCH_HEIGHT])
+
+    # adv_ = tf.compat.v1.placeholder(tf.float32, [None, 1])
+    # adversarial_ = tf.multiply(enhanced_gray, 1 - adv_) + tf.multiply(dslr_gray, adv_)
+    # adversarial_image = tf.reshape(adversarial_, [-1, PATCH_HEIGHT, PATCH_WIDTH, 1])
+    # discrim_predictions = adversarial(adversarial_image)
 
     # Losses
     enhanced_flat = tf.reshape(enhanced, [-1, TARGET_SIZE])
@@ -65,15 +70,12 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     # discrim_target = tf.concat([adv_, 1 - adv_], 1)
     # loss_discrim = -tf.reduce_sum(discrim_target * tf.compat.v1.log(tf.clip_by_value(discrim_predictions, 1e-10, 1.0)))
     # loss_texture = -loss_discrim
-
     # correct_predictions = tf.equal(tf.argmax(discrim_predictions, 1), tf.argmax(discrim_target, 1))
     # discim_accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32))
 
     # color loss
-
     # enhanced_blur = utils.blur(enhanced)
     # dslr_blur = utils.blur(dslr_image)
-
     # loss_color = tf.reduce_sum(tf.pow(dslr_blur - enhanced_blur, 2))/(2 * batch_size)
 
     # MSE loss
@@ -102,7 +104,10 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
 
     # Optimize network parameters
     generator_vars = [v for v in tf.compat.v1.global_variables() if v.name.startswith("generator")]
+    discriminator_vars = [v for v in tf.compat.v1.global_variables() if v.name.startswith("discriminator")]
+
     train_step_gen = tf.compat.v1.train.AdamOptimizer(learning_rate).minimize(loss_generator, var_list=generator_vars)
+    train_step_disc = tf.compat.v1.train.AdamOptimizer(learning_rate).minimize(loss_discrim, var_list=discriminator_vars)
 
     # Initialize and restore the variables
     print("Initializing variables...")
@@ -148,7 +153,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     for i in tqdm(range(iter_start, num_train_iters + 1), miniters=100):
         name_model_save_full = name_model_save + "_iteration_" + str(i)
 
-        # Train model
+        # Train genarator
         idx_train = np.random.randint(0, train_size, batch_size)
 
         phone_images = train_data[idx_train]
@@ -169,6 +174,19 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
         # Training step
         [loss_temp, temp] = sess.run([loss_generator, train_step_gen], feed_dict={phone_: phone_images, dslr_: dslr_images})
         training_loss += loss_temp / eval_step
+
+        # Train discrimintator
+        idx_train = np.random.randint(0, train_size, batch_size)
+
+        # generate image swaps (dslr or enhanced) for discriminator
+        swaps = np.reshape(np.random.randint(0, 2, batch_size), [batch_size, 1])
+
+        phone_images = train_data[idx_train]
+        dslr_images = train_answ[idx_train]
+
+        [accuracy_temp, temp] = sess.run([discim_accuracy, train_step_disc],
+                                        feed_dict={phone_: phone_images, dslr_: dslr_images, adv_: swaps})
+        train_acc_discrim += accuracy_temp / eval_step
 
         if i % eval_step == 0:
 
@@ -218,9 +236,11 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
 
             training_loss = 0.0
 
-        # Loading new training data
-        if i % 1000 == 0:
+        if i % test_step == 0 and i > 0:
 
+
+        # Loading new training data
+        if i % 1000 == 0 and i > 0:
             del train_data
             del train_answ
             train_data, train_answ = load_train_patch(dataset_dir, dslr_dir, phone_dir, train_size, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE)
