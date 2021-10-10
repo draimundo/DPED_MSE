@@ -4,6 +4,7 @@
 
 from functools import reduce
 import tensorflow as tf
+import scipy.stats as st
 import numpy as np
 import sys
 import os
@@ -33,7 +34,7 @@ def process_command_args(arguments):
     patch_w = 256 # default size for MAI dataset
     patch_h = 256 # default size for MAI dataset
     # --- training options ---
-    batch_size = 32
+    batch_size = 30
     train_size = 5000
     learning_rate = 5e-5
     eval_step = 1000
@@ -44,6 +45,9 @@ def process_command_args(arguments):
     fac_content = 1
     fac_mse = 200
     fac_ssim = 20
+    fac_color = 0.1
+    fac_texture = 0
+    norm_gen = True
 
     for args in arguments:
 
@@ -111,6 +115,8 @@ def process_command_args(arguments):
             save_mid_imgs = eval(args.split("=")[1])
         if args.startswith("leaky"):
             leaky = eval(args.split("=")[1])
+        if args.startswith("norm_gen"):
+            norm_gen = eval(args.split("=")[1])
 
         if args.startswith("fac_content"):
             fac_content = float(args.split("=")[1])
@@ -118,6 +124,10 @@ def process_command_args(arguments):
             fac_mse = float(args.split("=")[1])
         if args.startswith("fac_ssim"):
             fac_ssim = float(args.split("=")[1])
+        if args.startswith("fac_color"):
+            fac_color = float(args.split("=")[1])
+        if args.startswith("fac_texture"):
+            fac_texture = float(args.split("=")[1])
 
     # choose architecture
     if arch == "resnet":
@@ -148,12 +158,12 @@ def process_command_args(arguments):
     print("Path to VGG-19 network: " + vgg_dir)
     print("Path to RGB data from DSLR: " + dslr_dir)
     print("Path to Raw data from phone: " + phone_dir)
-    print("Loss function=" + " content:" + str(fac_content) + " +MSE:" + str(fac_mse) + " +SSIM:" + str(fac_ssim))
+    print("Loss function=" + " content:" + str(fac_content) + " +MSE:" + str(fac_mse) + " +SSIM:" + str(fac_ssim) + " +color:" + str(fac_color) + " +texture:" + str(fac_texture))
 
     return dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir,\
         arch, level, inst_norm, num_maps_base, restore_iter, patch_w, patch_h,\
             batch_size, train_size, learning_rate, eval_step, num_train_iters, save_mid_imgs, \
-                leaky, fac_content, fac_mse, fac_ssim
+                leaky, norm_gen, fac_content, fac_mse, fac_ssim, fac_color, fac_texture
 
 
 def process_test_model_args(arguments):

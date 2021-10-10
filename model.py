@@ -9,10 +9,10 @@ import numpy as np
 def resnet(input_image, leaky = True, instance_norm = True):
     with tf.compat.v1.variable_scope("generator"):
         
-        conv1 = _conv_layer(input_image, 64, 9, 1, batch_nn = False, leaky = leaky)
+        conv1 = _conv_layer(input_image, 64, 9, 1, instance_norm = False, leaky = leaky)
 
         conv_b1a = _conv_layer(conv1, 64, 3, 1, instance_norm = instance_norm, leaky = leaky)
-        conv_b1b = _conv_layer(convb1a, 64, 3, 1, instance_norm = instance_norm, leaky = leaky) + conv1
+        conv_b1b = _conv_layer(conv_b1a, 64, 3, 1, instance_norm = instance_norm, leaky = leaky) + conv1
 
         conv_b2a = _conv_layer(conv_b1b, 64, 3, 1, instance_norm = instance_norm, leaky = leaky)
         conv_b2b = _conv_layer(conv_b2a, 64, 3, 1, instance_norm = instance_norm, leaky = leaky) + conv_b1b
@@ -26,7 +26,7 @@ def resnet(input_image, leaky = True, instance_norm = True):
         conv2 = _conv_layer(conv_b4b, 64, 3, 1, instance_norm = False, leaky = leaky)
         conv3 = _conv_layer(conv2, 64, 3, 1, instance_norm = False, leaky = leaky)
         tconv1 = _conv_tranpose_layer(conv3, 64, 3, 2, leaky = leaky)
-        enhanced = tf.nn.tanh(_conv_layer(tconv1, 64, 9, 1, relu = False, instance_norm = False)) * 0.58 + 0.5
+        enhanced = tf.nn.tanh(_conv_layer(tconv1, 3, 9, 1, relu = False, instance_norm = False)) * 0.58 + 0.5
 
     return enhanced
 
@@ -34,13 +34,13 @@ def adversarial(image_):
 
     with tf.compat.v1.variable_scope("discriminator"):
 
-        conv1 = _conv_layer(image_, 48, 11, 4, batch_nn = False)
+        conv1 = _conv_layer(image_, 48, 11, 4, instance_norm = False)
         conv2 = _conv_layer(conv1, 128, 5, 2)
         conv3 = _conv_layer(conv2, 192, 3, 1)
         conv4 = _conv_layer(conv3, 192, 3, 1)
         conv5 = _conv_layer(conv4, 128, 3, 2)
         
-        flat_size = 128 * 7 * 7
+        flat_size = 128 * 16 * 16
         conv5_flat = tf.reshape(conv5, [-1, flat_size])
 
         W_fc = tf.Variable(tf.compat.v1.truncated_normal([flat_size, 1024], stddev=0.01))
@@ -123,7 +123,7 @@ def _conv_layer(net, num_filters, filter_size, strides, relu=True, instance_norm
     if relu:
         if leaky:
             net = tf.compat.v1.nn.leaky_relu(net)
-        else
+        else:
             net = tf.compat.v1.nn.relu(net)
 
     return net

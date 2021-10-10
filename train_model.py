@@ -21,7 +21,7 @@ from tqdm import tqdm
 dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir,\
     arch, LEVEL, inst_norm, num_maps_base, restore_iter, patch_w, patch_h,\
         batch_size, train_size, learning_rate, eval_step, num_train_iters, save_mid_imgs, \
-        leaky, fac_content, fac_mse, fac_ssim, fac_color, fac_texture \
+        leaky, norm_gen, fac_content, fac_mse, fac_ssim, fac_color, fac_texture \
         = utils.process_command_args(sys.argv)
 
 # Defining the size of the input and target image patches
@@ -51,7 +51,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
 
     if arch == "resnet":
         name_model = "resnet"
-        enhanced = resnet(phone_, leaky)
+        enhanced = resnet(phone_, leaky = leaky, instance_norm = norm_gen)
 
 
     # Losses
@@ -64,30 +64,30 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     loss_text = ["loss_mse"]
 
     # texture (adversarial) loss
-    if fac_texture > 0:
-        enhanced_gray = tf.reshape(tf.image.rgb_to_grayscale(enhanced), [-1, PATCH_WIDTH * PATCH_HEIGHT])
-        dslr_gray = tf.reshape(tf.image.rgb_to_grayscale(dslr_image),[-1, PATCH_WIDTH * PATCH_HEIGHT])
-        # push randomly the enhanced or dslr image to an adversarial CNN-discriminator
+    # if fac_texture > 0:
+    #     enhanced_gray = tf.reshape(tf.image.rgb_to_grayscale(enhanced), [-1, TARGET_WIDTH * TARGET_HEIGHT])
+    #     dslr_gray = tf.reshape(tf.image.rgb_to_grayscale(dslr_),[-1, TARGET_WIDTH * TARGET_HEIGHT])
+    #     # push randomly the enhanced or dslr image to an adversarial CNN-discriminator
 
-        adv_ = tf.compat.v1.placeholder(tf.float32, [None, 1])
-        adversarial_ = tf.multiply(enhanced_gray, 1 - adv_) + tf.multiply(dslr_gray, adv_)
-        adversarial_image = tf.reshape(adversarial_, [-1, PATCH_HEIGHT, PATCH_WIDTH, 1])
-        discrim_predictions = adversarial(adversarial_image)
-        discrim_target = tf.concat([adv_, 1 - adv_], 1)
-        loss_discrim = -tf.reduce_sum(discrim_target * tf.compat.v1.log(tf.clip_by_value(discrim_predictions, 1e-10, 1.0)))
-        loss_texture = -loss_discrim
-        correct_predictions = tf.equal(tf.argmax(discrim_predictions, 1), tf.argmax(discrim_target, 1))
-        discim_accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32))
-        loss_generator = loss_generator + loss_texture * fac_texture
-        loss_list.append(loss_texture)
-        loss_text.append("loss_texture")
+    #     adv_ = tf.compat.v1.placeholder(tf.float32, [None, 1])
+    #     adversarial_ = tf.multiply(enhanced_gray, 1 - adv_) + tf.multiply(dslr_gray, adv_)
+    #     adversarial_image = tf.reshape(adversarial_, [-1, TARGET_HEIGHT, TARGET_WIDTH, 1])
+    #     discrim_predictions = adversarial(adversarial_image)
+    #     discrim_target = tf.concat([adv_, 1 - adv_], 1)
+    #     loss_discrim = -tf.reduce_sum(discrim_target * tf.compat.v1.log(tf.clip_by_value(discrim_predictions, 1e-10, 1.0)))
+    #     loss_texture = -loss_discrim
+    #     correct_predictions = tf.equal(tf.argmax(discrim_predictions, 1), tf.argmax(discrim_target, 1))
+    #     discim_accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32))
+    #     loss_generator = loss_generator + loss_texture * fac_texture
+    #     loss_list.append(loss_texture)
+    #     loss_text.append("loss_texture")
     
     # color loss
     if fac_color > 0:
         enhanced_blur = utils.blur(enhanced)
-        dslr_blur = utils.blur(dslr_image)
+        dslr_blur = utils.blur(dslr_)
         loss_color = tf.reduce_sum(tf.pow(dslr_blur - enhanced_blur, 2))/(2 * batch_size)
-        loss_generator = loss_generator + loss_color * fac_color
+        loss_generator += loss_color * fac_color
         loss_list.append(loss_color)
         loss_text.append("loss_color")
 
@@ -99,7 +99,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     # SSIM loss
     if fac_ssim > 0:
         loss_ssim = tf.reduce_mean(tf.image.ssim(enhanced, dslr_, 1.0))
-        loss_generator = loss_generator + (1 - loss_ssim) * fac_ssim
+        loss_generator += (1 - loss_ssim) * fac_ssim
         loss_list.append(loss_ssim)
         loss_text.append("loss_ssim")
 
@@ -115,12 +115,11 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
 
         content_size = utils._tensor_size(dslr_vgg[CONTENT_LAYER]) * batch_size
         loss_content = 2 * tf.nn.l2_loss(enhanced_vgg[CONTENT_LAYER] - dslr_vgg[CONTENT_LAYER]) / content_size
-        loss_generator = loss_generator + loss_content * fac_content
+        loss_generator += loss_content * fac_content
         loss_list.append(loss_content)
         loss_text.append("loss_content")
 
     # Final loss function
-    loss_generator = loss_mse * fac_mse + loss_content * fac_content + (1 - loss_ssim) * fac_ssim
     loss_list.insert(0, loss_generator)
     loss_text.insert(0, "loss_generator")
 
@@ -128,9 +127,9 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     generator_vars = [v for v in tf.compat.v1.global_variables() if v.name.startswith("generator")]
     train_step_gen = tf.compat.v1.train.AdamOptimizer(learning_rate).minimize(loss_generator, var_list=generator_vars)
 
-    if fac_texture > 0:
-        discriminator_vars = [v for v in tf.compat.v1.global_variables() if v.name.startswith("discriminator")]
-        train_step_disc = tf.compat.v1.train.AdamOptimizer(learning_rate).minimize(loss_discrim, var_list=discriminator_vars)
+    # if fac_texture > 0:
+    #     discriminator_vars = [v for v in tf.compat.v1.global_variables() if v.name.startswith("discriminator")]
+    #     train_step_disc = tf.compat.v1.train.AdamOptimizer(learning_rate).minimize(loss_discrim, var_list=discriminator_vars)
 
     # Initialize and restore the variables
     print("Initializing variables...")
@@ -170,6 +169,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     logs.close()
 
     training_loss = 0.0
+    train_acc_discrim = 0.0
 
     name_model_save = name_model
     
@@ -199,23 +199,23 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
         training_loss += loss_temp / eval_step
 
         # Train discrimintator
-        if loss_texture > 0:
-            idx_train = np.random.randint(0, train_size, batch_size)
+    
+        # idx_train = np.random.randint(0, train_size, batch_size)
 
-            # generate image swaps (dslr or enhanced) for discriminator
-            swaps = np.reshape(np.random.randint(0, 2, batch_size), [batch_size, 1])
+        # # generate image swaps (dslr or enhanced) for discriminator
+        # swaps = np.reshape(np.random.randint(0, 2, batch_size), [batch_size, 1])
 
-            phone_images = train_data[idx_train]
-            dslr_images = train_answ[idx_train]
+        # phone_images = train_data[idx_train]
+        # dslr_images = train_answ[idx_train]
 
-            [accuracy_temp, temp] = sess.run([discim_accuracy, train_step_disc],
-                                            feed_dict={phone_: phone_images, dslr_: dslr_images, adv_: swaps})
-            train_acc_discrim += accuracy_temp / eval_step
+        # [accuracy_temp, temp] = sess.run([discim_accuracy, train_step_disc],
+        #                                 feed_dict={phone_: phone_images, dslr_: dslr_images, adv_: swaps})
+        # train_acc_discrim += accuracy_temp / eval_step
 
         if i % eval_step == 0:
 
             # Evaluate model
-            val_losses = np.zeros((1, 4))
+            val_losses = np.zeros((1, len(loss_text)))
 
             for j in range(num_val_batches):
 
@@ -230,9 +230,12 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
 
                 val_losses += np.asarray(losses) / num_val_batches
 
-            logs_gen = "step %d | training: %.4g, validation: %.4g | content: %.4g, mse: %.4g, " \
-                           "ssim: %.4g\n" % (i, training_loss, val_losses[0][0], val_losses[0][1],
-                                                val_losses[0][2], val_losses[0][3])
+            logs_gen = "step %d | training: %.4g,  "  % (i, training_loss, val_losses[0][0])
+            for idx, loss in enumerate(loss_text):
+                logs_gen += "%s: %.4g; " % (loss, val_losses[0][idx])
+            
+            logs_gen += "\n"
+
             print(logs_gen)
 
             # Save the results to log file
@@ -259,7 +262,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
 
             training_loss = 0.0
 
-        if i % test_step == 0 and i > 0:
+        #if i % test_step == 0 and i > 0:
 
 
         # Loading new training data
