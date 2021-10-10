@@ -21,7 +21,7 @@ from tqdm import tqdm
 dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir,\
     arch, LEVEL, inst_norm, num_maps_base, restore_iter, patch_w, patch_h,\
         batch_size, train_size, learning_rate, eval_step, num_train_iters, save_mid_imgs, \
-        leaky, fac_content, fac_mse, fac_ssim \
+        leaky, fac_content, fac_mse, fac_ssim, fac_color, fac_texture \
         = utils.process_command_args(sys.argv)
 
 # Defining the size of the input and target image patches
@@ -53,61 +53,84 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
         name_model = "resnet"
         enhanced = resnet(phone_, leaky)
 
-    # push randomly the enhanced or dslr image to an adversarial CNN-discriminator
-    # enhanced_gray = tf.reshape(tf.image.rgb_to_grayscale(enhanced), [-1, PATCH_WIDTH * PATCH_HEIGHT])
-    # dslr_gray = tf.reshape(tf.image.rgb_to_grayscale(dslr_image),[-1, PATCH_WIDTH * PATCH_HEIGHT])
-
-    # adv_ = tf.compat.v1.placeholder(tf.float32, [None, 1])
-    # adversarial_ = tf.multiply(enhanced_gray, 1 - adv_) + tf.multiply(dslr_gray, adv_)
-    # adversarial_image = tf.reshape(adversarial_, [-1, PATCH_HEIGHT, PATCH_WIDTH, 1])
-    # discrim_predictions = adversarial(adversarial_image)
 
     # Losses
+    # MSE loss
     enhanced_flat = tf.reshape(enhanced, [-1, TARGET_SIZE])
     dslr_flat = tf.reshape(dslr_, [-1, TARGET_SIZE])
+    loss_mse = 2*tf.nn.l2_loss(dslr_flat - enhanced_flat)/(TARGET_SIZE * batch_size)
+    loss_generator = loss_mse * fac_mse
+    loss_list = [loss_mse]
+    loss_text = ["loss_mse"]
 
     # texture (adversarial) loss
-    # discrim_target = tf.concat([adv_, 1 - adv_], 1)
-    # loss_discrim = -tf.reduce_sum(discrim_target * tf.compat.v1.log(tf.clip_by_value(discrim_predictions, 1e-10, 1.0)))
-    # loss_texture = -loss_discrim
-    # correct_predictions = tf.equal(tf.argmax(discrim_predictions, 1), tf.argmax(discrim_target, 1))
-    # discim_accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32))
+    if fac_texture > 0:
+        enhanced_gray = tf.reshape(tf.image.rgb_to_grayscale(enhanced), [-1, PATCH_WIDTH * PATCH_HEIGHT])
+        dslr_gray = tf.reshape(tf.image.rgb_to_grayscale(dslr_image),[-1, PATCH_WIDTH * PATCH_HEIGHT])
+        # push randomly the enhanced or dslr image to an adversarial CNN-discriminator
 
+        adv_ = tf.compat.v1.placeholder(tf.float32, [None, 1])
+        adversarial_ = tf.multiply(enhanced_gray, 1 - adv_) + tf.multiply(dslr_gray, adv_)
+        adversarial_image = tf.reshape(adversarial_, [-1, PATCH_HEIGHT, PATCH_WIDTH, 1])
+        discrim_predictions = adversarial(adversarial_image)
+        discrim_target = tf.concat([adv_, 1 - adv_], 1)
+        loss_discrim = -tf.reduce_sum(discrim_target * tf.compat.v1.log(tf.clip_by_value(discrim_predictions, 1e-10, 1.0)))
+        loss_texture = -loss_discrim
+        correct_predictions = tf.equal(tf.argmax(discrim_predictions, 1), tf.argmax(discrim_target, 1))
+        discim_accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32))
+        loss_generator = loss_generator + loss_texture * fac_texture
+        loss_list.append(loss_texture)
+        loss_text.append("loss_texture")
+    
     # color loss
-    # enhanced_blur = utils.blur(enhanced)
-    # dslr_blur = utils.blur(dslr_image)
-    # loss_color = tf.reduce_sum(tf.pow(dslr_blur - enhanced_blur, 2))/(2 * batch_size)
-
-    # MSE loss
-    loss_mse = 2*tf.nn.l2_loss(dslr_flat - enhanced_flat)/(TARGET_SIZE * batch_size)
+    if fac_color > 0:
+        enhanced_blur = utils.blur(enhanced)
+        dslr_blur = utils.blur(dslr_image)
+        loss_color = tf.reduce_sum(tf.pow(dslr_blur - enhanced_blur, 2))/(2 * batch_size)
+        loss_generator = loss_generator + loss_color * fac_color
+        loss_list.append(loss_color)
+        loss_text.append("loss_color")
 
     # PSNR loss
     loss_psnr = tf.reduce_mean(tf.image.psnr(enhanced, dslr_, 1.0))
+    loss_list.append(loss_psnr)
+    loss_text.append("loss_psnr")
 
     # SSIM loss
-    loss_ssim = tf.reduce_mean(tf.image.ssim(enhanced, dslr_, 1.0))
+    if fac_ssim > 0:
+        loss_ssim = tf.reduce_mean(tf.image.ssim(enhanced, dslr_, 1.0))
+        loss_generator = loss_generator + (1 - loss_ssim) * fac_ssim
+        loss_list.append(loss_ssim)
+        loss_text.append("loss_ssim")
 
     # MS-SSIM loss
     #loss_ms_ssim = tf.reduce_mean(tf.image.ssim_multiscale(enhanced, dslr_, 1.0))
 
     # Content loss
-    CONTENT_LAYER = 'relu5_4'
+    if fac_content > 0:
+        CONTENT_LAYER = 'relu5_4'
 
-    enhanced_vgg = vgg.net(vgg_dir, vgg.preprocess(enhanced * 255))
-    dslr_vgg = vgg.net(vgg_dir, vgg.preprocess(dslr_ * 255))
+        enhanced_vgg = vgg.net(vgg_dir, vgg.preprocess(enhanced * 255))
+        dslr_vgg = vgg.net(vgg_dir, vgg.preprocess(dslr_ * 255))
 
-    content_size = utils._tensor_size(dslr_vgg[CONTENT_LAYER]) * batch_size
-    loss_content = 2 * tf.nn.l2_loss(enhanced_vgg[CONTENT_LAYER] - dslr_vgg[CONTENT_LAYER]) / content_size
+        content_size = utils._tensor_size(dslr_vgg[CONTENT_LAYER]) * batch_size
+        loss_content = 2 * tf.nn.l2_loss(enhanced_vgg[CONTENT_LAYER] - dslr_vgg[CONTENT_LAYER]) / content_size
+        loss_generator = loss_generator + loss_content * fac_content
+        loss_list.append(loss_content)
+        loss_text.append("loss_content")
 
     # Final loss function
     loss_generator = loss_mse * fac_mse + loss_content * fac_content + (1 - loss_ssim) * fac_ssim
+    loss_list.insert(0, loss_generator)
+    loss_text.insert(0, "loss_generator")
 
     # Optimize network parameters
     generator_vars = [v for v in tf.compat.v1.global_variables() if v.name.startswith("generator")]
-    discriminator_vars = [v for v in tf.compat.v1.global_variables() if v.name.startswith("discriminator")]
-
     train_step_gen = tf.compat.v1.train.AdamOptimizer(learning_rate).minimize(loss_generator, var_list=generator_vars)
-    train_step_disc = tf.compat.v1.train.AdamOptimizer(learning_rate).minimize(loss_discrim, var_list=discriminator_vars)
+
+    if fac_texture > 0:
+        discriminator_vars = [v for v in tf.compat.v1.global_variables() if v.name.startswith("discriminator")]
+        train_step_disc = tf.compat.v1.train.AdamOptimizer(learning_rate).minimize(loss_discrim, var_list=discriminator_vars)
 
     # Initialize and restore the variables
     print("Initializing variables...")
@@ -176,17 +199,18 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
         training_loss += loss_temp / eval_step
 
         # Train discrimintator
-        idx_train = np.random.randint(0, train_size, batch_size)
+        if loss_texture > 0:
+            idx_train = np.random.randint(0, train_size, batch_size)
 
-        # generate image swaps (dslr or enhanced) for discriminator
-        swaps = np.reshape(np.random.randint(0, 2, batch_size), [batch_size, 1])
+            # generate image swaps (dslr or enhanced) for discriminator
+            swaps = np.reshape(np.random.randint(0, 2, batch_size), [batch_size, 1])
 
-        phone_images = train_data[idx_train]
-        dslr_images = train_answ[idx_train]
+            phone_images = train_data[idx_train]
+            dslr_images = train_answ[idx_train]
 
-        [accuracy_temp, temp] = sess.run([discim_accuracy, train_step_disc],
-                                        feed_dict={phone_: phone_images, dslr_: dslr_images, adv_: swaps})
-        train_acc_discrim += accuracy_temp / eval_step
+            [accuracy_temp, temp] = sess.run([discim_accuracy, train_step_disc],
+                                            feed_dict={phone_: phone_images, dslr_: dslr_images, adv_: swaps})
+            train_acc_discrim += accuracy_temp / eval_step
 
         if i % eval_step == 0:
 
@@ -201,8 +225,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
                 phone_images = val_data[be:en]
                 dslr_images = val_answ[be:en]
 
-                [enhanced_crops, losses] = sess.run([enhanced, \
-                                [loss_generator, loss_content, loss_mse, loss_ssim]], \
+                [enhanced_crops, losses] = sess.run([enhanced, loss_list], \
                                 feed_dict={phone_: phone_images, dslr_: dslr_images})
 
                 val_losses += np.asarray(losses) / num_val_batches

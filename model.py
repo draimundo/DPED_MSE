@@ -26,7 +26,7 @@ def resnet(input_image, leaky = True, instance_norm = True):
         conv2 = _conv_layer(conv_b4b, 64, 3, 1, instance_norm = False, leaky = leaky)
         conv3 = _conv_layer(conv2, 64, 3, 1, instance_norm = False, leaky = leaky)
         tconv1 = _conv_tranpose_layer(conv3, 64, 3, 2, leaky = leaky)
-        enhanced = tf.nn.tanh(_conv_layer(tconv1, 64, 9, 1, relu = False, instance_norm = False) * 0.58 + 0.5
+        enhanced = tf.nn.tanh(_conv_layer(tconv1, 64, 9, 1, relu = False, instance_norm = False)) * 0.58 + 0.5
 
     return enhanced
 
