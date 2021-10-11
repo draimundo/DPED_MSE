@@ -58,7 +58,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     # MSE loss
     enhanced_flat = tf.reshape(enhanced, [-1, TARGET_SIZE])
     dslr_flat = tf.reshape(dslr_, [-1, TARGET_SIZE])
-    loss_mse = 2*tf.nn.l2_loss(dslr_flat - enhanced_flat)/(TARGET_SIZE * batch_size)
+    loss_mse = tf.reduce_mean(tf.math.squared_difference(dslr_flat, enhanced_flat))
     loss_generator = loss_mse * fac_mse
     loss_list = [loss_mse]
     loss_text = ["loss_mse"]
@@ -86,7 +86,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     if fac_color > 0:
         enhanced_blur = utils.blur(enhanced)
         dslr_blur = utils.blur(dslr_)
-        loss_color = tf.reduce_sum(tf.pow(dslr_blur - enhanced_blur, 2))/(2 * batch_size)
+        loss_color = tf.reduce_mean(tf.math.squared_difference(dslr_blur, enhanced_blur))
         loss_generator += loss_color * fac_color
         loss_list.append(loss_color)
         loss_text.append("loss_color")
@@ -113,8 +113,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
         enhanced_vgg = vgg.net(vgg_dir, vgg.preprocess(enhanced * 255))
         dslr_vgg = vgg.net(vgg_dir, vgg.preprocess(dslr_ * 255))
 
-        content_size = utils._tensor_size(dslr_vgg[CONTENT_LAYER]) * batch_size
-        loss_content = 2 * tf.nn.l2_loss(enhanced_vgg[CONTENT_LAYER] - dslr_vgg[CONTENT_LAYER]) / content_size
+        loss_content = tf.reduce_mean(tf.math.squared_difference(enhanced_vgg[CONTENT_LAYER], dslr_vgg[CONTENT_LAYER]))
         loss_generator += loss_content * fac_content
         loss_list.append(loss_content)
         loss_text.append("loss_content")
