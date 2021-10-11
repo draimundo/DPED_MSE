@@ -230,7 +230,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
 
                 val_losses += np.asarray(losses) / num_val_batches
 
-            logs_gen = "step %d | training: %.4g,  "  % (i, training_loss, val_losses[0][0])
+            logs_gen = "step %d | training: %.4g,  "  % (i, training_loss)
             for idx, loss in enumerate(loss_text):
                 logs_gen += "%s: %.4g; " % (loss, val_losses[0][idx])
             
