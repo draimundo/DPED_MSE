@@ -42,11 +42,11 @@ def process_command_args(arguments):
     # --- more options ---
     save_mid_imgs = False
     leaky = True
-    fac_content = 1
+    fac_content = 0.5
     fac_mse = 200
-    fac_ssim = 20
-    fac_color = 0.1
-    fac_texture = 0
+    fac_ssim = 2
+    fac_color = 200
+    fac_texture = 1
     norm_gen = True
 
     for args in arguments:
