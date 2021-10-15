@@ -62,23 +62,20 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     loss_text = ["loss_mse"]
 
     ## Adversarial loss
-    ### Prepare inputs
     enhanced_gray = tf.reshape(tf.image.rgb_to_grayscale(enhanced), [-1, TARGET_WIDTH * TARGET_HEIGHT])
     dslr_gray = tf.reshape(tf.image.rgb_to_grayscale(dslr_),[-1, TARGET_WIDTH * TARGET_HEIGHT])
     adv_ = tf.compat.v1.placeholder(tf.float32, [None, 1])
     adversarial_ = tf.multiply(enhanced_gray, 1 - adv_) + tf.multiply(dslr_gray, adv_)
     adversarial_image = tf.reshape(adversarial_, [-1, TARGET_HEIGHT, TARGET_WIDTH, 1])
     discrim_predictions = adversarial(adversarial_image)
-    ### Generator losses
-    loss_texture = -tf.reduce_mean(tf.compat.v1.log(tf.clip_by_value(discrim_predictions, 1e-10, 1.0)))
-    loss_generator += loss_texture * fac_texture
-    loss_list.append(loss_texture)
-    loss_text.append("loss_texture")
-    ### Discriminator losses
     discrim_target = tf.concat([adv_, 1 - adv_], 1)
-    loss_discrim = -tf.reduce_mean(discrim_target * tf.compat.v1.log(tf.clip_by_value(discrim_predictions, 1e-10, 1.0)))
+    loss_discrim = -tf.reduce_sum(discrim_target * tf.compat.v1.log(tf.clip_by_value(discrim_predictions, 1e-10, 1.0)))
+    loss_texture = -loss_discrim
     correct_predictions = tf.equal(tf.argmax(discrim_predictions, 1), tf.argmax(discrim_target, 1))
     discim_accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32))
+    loss_list.append(loss_texture)
+    loss_text.append("loss_texture")
+
     
     ## Color loss
     if fac_color > 0:
@@ -204,18 +201,6 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
 
         phone_images = train_data[idx_train]
         dslr_images = train_answ[idx_train]
-
-        # Data augmentation: random flips and rotations
-        for k in range(batch_size):
-
-            random_rotate = np.random.randint(1, 100) % 4
-            phone_images[k] = np.rot90(phone_images[k], random_rotate)
-            dslr_images[k] = np.rot90(dslr_images[k], random_rotate)
-            random_flip = np.random.randint(1, 100) % 2
-
-            if random_flip == 1:
-                phone_images[k] = np.flipud(phone_images[k])
-                dslr_images[k] = np.flipud(dslr_images[k])
 
         [accuracy_temp, temp] = sess.run([discim_accuracy, train_step_disc],
                                         feed_dict={phone_: phone_images, dslr_: dslr_images, adv_: swaps})
