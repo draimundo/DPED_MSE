@@ -9,7 +9,7 @@ import numpy as np
 import sys
 from datetime import datetime
 
-from load_dataset import load_train_patch, load_train_patch_exp, load_val_data, load_val_data_exp
+from load_dataset import load_train_patch_exp, load_val_data_exp
 from model import resnet, adversarial
 import utils
 import vgg
@@ -272,6 +272,6 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
         if i % 1000 == 0 and i > 0:
             del train_data
             del train_answ
-            train_data, train_answ = load_train_patch(dataset_dir, dslr_dir, phone_dir, train_size, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE)
+            train_data, train_answ = load_train_patch_exp(dataset_dir, dslr_dir, phone_dir, train_size, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE)
 
     print('total train/eval time:', datetime.now() - time_start)
