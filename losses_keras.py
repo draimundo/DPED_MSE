@@ -4,14 +4,60 @@ import vgg
 import scipy.stats as st
 from skimage.filters import window
 
+
+class loss_creator(tf.keras.losses.loss):
+    def __init__(self, vgg_dir, patch_w, patch_h, mse, fourier, content, color, ssim, name="custom_loss"):
+        super().__init__(name=name)
+        self.facMse = mse
+        self.facFourier = fourier
+        if self.facFourier > 0:
+            self.fourier = loss_fourier(patch_w, patch_h)
+        self.facContent = content
+        if self.facContent > 0:
+            self.content = loss_content(vgg_dir)
+        self.facColor = color
+        self.facSsim = ssim
+    def call(self, y_true, y_pred):
+        loss = 0.0
+        if self.facMse > 0:
+            loss += self.facMse * loss_mse(y_true, y_pred)
+        if self.facFourier > 0:
+            loss += self.facFourier * self.fourier(y_true, y_pred)
+        if self.facContent > 0:
+            loss += self.facContent * self.content(y_true, y_pred)
+        if self.facColor > 0:
+            loss += self.facColor * loss_color(y_true, y_pred)
+        if self.facSsim > 0:
+            loss += self.facSsim * loss_ssim(y_true, y_pred)
+        return loss
+
 def loss_mse(y_true, y_pred):
     return tf.reduce_mean(tf.math.squared_difference(y_true, y_pred))
 
-def loss_fourier(y_true, y_pred):
-    hann2d = window('hann', (256, 256))
-    #TODO process by color (mult by win + rfft2d)
-    #TODO compute mag and phase
+class loss_fourier(tf.keras.losses.Loss):
+    def __init__(self, patch_w, patch_h, name="loss_fourier"):
+        super().__init__(name=name)
+        h2d = window('hann', (patch_w, patch_h))
+        self.hann2d = tf.stack([h2d, h2d, h2d]) #stack for 3 color channels
+        self.patch_w = patch_w
+        self.patch_h = patch_h
+    
+    def call(self, y_true, y_pred):
+        y_true = tf.multiply(y_true, self.hann2d) #filter with hann window
+        y_pred = tf.multiply(y_pred, self.hann2d)
 
+        err_mag = 0.0
+        err_ang = 0.0
+        for im in range (y_true.shape[0]): #iterate through images
+            for ch in range(y_true.shape[-1]): #iterate through channels
+                true_mag = tf.abs(y_true[im, ..., ch])
+                true_ang = tf.math.angle(y_true[im, ..., ch])
+                pred_mag = tf.abs(y_pred[im, ..., ch])
+                pred_ang = tf.math.angle(y_pred[im, ..., ch])
+
+                err_mag += tf.reduce_mean(tf.abs(true_mag - pred_mag))
+                err_ang += tf.reduce_mean(tf.abs(true_ang - pred_ang))
+        return (err_mag + err_ang)/2
 
 class loss_content(tf.keras.losses.Loss):
     def __init__(self, vgg_dir, name="loss_content"):
@@ -27,7 +73,7 @@ class loss_content(tf.keras.losses.Loss):
 def loss_color(y_true, y_pred):
     return tf.reduce_mean(tf.math.squared_difference(_blur(y_true), _blur(y_pred)))
 
-def loss_psnr(y_true, y_pred):
+def metr_psnr(y_true, y_pred):
     return tf.reduce_mean(tf.image.psnr(y_true, y_pred, 1.0))
 
 def loss_ssim(y_true, y_pred):
