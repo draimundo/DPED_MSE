@@ -227,7 +227,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
                 # [enhanced_crops, accuracy_disc, losses] = sess.run([enhanced, discim_accuracy, loss_list], \
                 #                 feed_dict={phone_: phone_images, dslr_: dslr_images, adv_: swaps})
 
-                [enhanced_crops, accuracy_disc, losses] = sess.run([enhanced, loss_list], \
+                [enhanced_crops, losses] = sess.run([enhanced, loss_list], \
                     feed_dict={phone_: phone_images, dslr_: dslr_images})
 
                 val_losses_gen += np.asarray(losses) / num_val_batches
