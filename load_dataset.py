@@ -75,15 +75,15 @@ def load_val_data_exp(dataset_dir, dslr_dir, phone_dir, over_dir, under_dir, PAT
     for img in tqdm(range(0, NUM_VAL_IMAGES), miniters=100):
         In = np.asarray(imageio.imread((val_directory_phone + str(img) + '.png')))
         In = extract_bayer_channels(In)
-        val_data[i, 0:4] = In
+        val_data[i, ...,0:4] = In
 
         Io = np.asarray(imageio.imread((val_directory_over + str(img) + '.png')))
         Io = extract_bayer_channels(Io)
-        val_data[i, 4:8] = Io
+        val_data[i, ...,4:8] = Io
 
         Iu = np.asarray(imageio.imread((val_directory_under + str(img) + '.png')))
         Iu = extract_bayer_channels(Iu)
-        val_data[i, 8:12] = Iu
+        val_data[i, ...,8:12] = Iu
 
         I = Image.open(val_directory_dslr + str(img) + '.' + format_dslr)
         I = np.array(I.resize((int(I.size[0] * DSLR_SCALE / 2), int(I.size[1] * DSLR_SCALE / 2)), resample=Image.BICUBIC))
@@ -181,15 +181,15 @@ def load_train_patch_exp(dataset_dir, dslr_dir, phone_dir, over_dir, under_dir, 
     for img in tqdm(TRAIN_IMAGES, miniters=100):
         In = np.asarray(imageio.imread((train_directory_phone + str(img) + '.png')))
         In = extract_bayer_channels(In)
-        train_data[i, 0:4] = In
+        train_data[i, ...,0:4] = In
 
         Io = np.asarray(imageio.imread((train_directory_over + str(img) + '.png')))
         Io = extract_bayer_channels(Io)
-        train_data[i, 4:8] = Io
+        train_data[i, ...,4:8] = Io
 
         Iu = np.asarray(imageio.imread((train_directory_under + str(img) + '.png')))
         Iu = extract_bayer_channels(Iu)
-        train_data[i, 8:12] = Iu
+        train_data[i, ...,8:12] = Iu
 
         I = Image.open(train_directory_dslr + str(img) + '.' + format_dslr)
         I = np.array(I.resize((int(I.size[0] * DSLR_SCALE / 2), int(I.size[1] * DSLR_SCALE / 2)), resample=Image.BICUBIC))
