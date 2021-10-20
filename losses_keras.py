@@ -5,7 +5,7 @@ import scipy.stats as st
 from skimage.filters import window
 
 
-class loss_creator(tf.keras.losses.loss):
+class loss_creator(tf.keras.losses.Loss):
     def __init__(self, vgg_dir, patch_w, patch_h, mse, fourier, content, color, ssim, name="custom_loss"):
         super().__init__(name=name)
         self.facMse = mse
@@ -37,8 +37,8 @@ def loss_mse(y_true, y_pred):
 class loss_fourier(tf.keras.losses.Loss):
     def __init__(self, patch_w, patch_h, name="loss_fourier"):
         super().__init__(name=name)
-        h2d = window('hann', (patch_w, patch_h))
-        self.hann2d = tf.stack([h2d, h2d, h2d]) #stack for 3 color channels
+        h2d = np.float32(window('hann', (patch_w, patch_h)))
+        self.hann2d = tf.stack([h2d,h2d,h2d],axis=2) #stack for 3 color channels
         self.patch_w = patch_w
         self.patch_h = patch_h
     
@@ -48,15 +48,16 @@ class loss_fourier(tf.keras.losses.Loss):
 
         err_mag = 0.0
         err_ang = 0.0
-        for im in range (y_true.shape[0]): #iterate through images
-            for ch in range(y_true.shape[-1]): #iterate through channels
-                true_mag = tf.abs(y_true[im, ..., ch])
-                true_ang = tf.math.angle(y_true[im, ..., ch])
-                pred_mag = tf.abs(y_pred[im, ..., ch])
-                pred_ang = tf.math.angle(y_pred[im, ..., ch])
 
-                err_mag += tf.reduce_mean(tf.abs(true_mag - pred_mag))
-                err_ang += tf.reduce_mean(tf.abs(true_ang - pred_ang))
+        for ch in range(y_true.shape[-1]): #iterate through channels
+            true_mag = tf.abs(y_true[..., ch])
+            true_ang = tf.math.angle(y_true[..., ch])
+            pred_mag = tf.abs(y_pred[..., ch])
+            pred_ang = tf.math.angle(y_pred[..., ch])
+
+            err_mag += tf.reduce_mean(tf.abs(true_mag - pred_mag))
+            err_ang += tf.reduce_mean(tf.abs(true_ang - pred_ang))
+
         return (err_mag + err_ang)/2
 
 class loss_content(tf.keras.losses.Loss):

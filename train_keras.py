@@ -1,10 +1,10 @@
 import tensorflow as tf
-import imageio
 import numpy as np
 import sys
-from datetime import datetime
+import time
 
-from load_dataset import load_train_patch, load_train_patch_exp, load_val_data
+from datetime import datetime
+from load_dataset_keras import image_generator
 
 import utils
 
@@ -14,47 +14,62 @@ from losses_keras import *
 from model_keras import *
 
 
-# Processing command arguments
-dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir,\
-    arch, LEVEL, inst_norm, num_maps_base, restore_iter, patch_w, patch_h,\
-        batch_size, train_size, learning_rate, eval_step, num_train_iters, save_mid_imgs, \
-        leaky, norm_gen, fac_content, fac_mse, fac_ssim, fac_color, fac_texture \
-        = utils.process_command_args(sys.argv)
-
-# Defining the size of the input and target image patches
-PATCH_WIDTH = patch_w//2
-PATCH_HEIGHT = patch_h//2
-PATCH_SIZE = PATCH_WIDTH * PATCH_HEIGHT * 3
-
+dataset_dir = 'raw_images/'
+dslr_dir = 'fujifilm/'
+phone_dir = 'mediatek_raw/'
+over_dir = 'mediatek_raw_over/'
+under_dir = 'mediatek_raw_under/'
+triple_exposure = True
 LEVEL = 0
 DSLR_SCALE = float(1) / (2 ** (max(LEVEL,0) - 1))
-TARGET_WIDTH = int(PATCH_WIDTH * DSLR_SCALE)
-TARGET_HEIGHT = int(PATCH_HEIGHT * DSLR_SCALE)
-TARGET_DEPTH = 3
-TARGET_SIZE = TARGET_WIDTH * TARGET_HEIGHT * TARGET_DEPTH
+PATCH_WIDTH = 256
+PATCH_HEIGHT = 256
 
-np.random.seed(0)
+train_size = 5
 
-time_start = datetime.now()
 
-# Loading training and validation data
-print("Loading training data...")
-if exp_augmentation:
-    train_data, train_answ = load_train_patch_exp(dataset_dir, dslr_dir, phone_dir, over_dir, under_dir, train_size, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE):
-else:
-    train_data, train_answ = load_train_patch(dataset_dir, dslr_dir, phone_dir, train_size, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE)
-print("Training data was loaded\n")
+train_generator = image_generator(dataset_dir, dslr_dir, phone_dir, 'train/', PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, triple_exposure, over_dir, under_dir)
+train_dataset = tf.data.Dataset.from_tensor_slices(train_generator.get_list())
+train_dataset = train_dataset.shuffle(train_generator.length())
+train_dataset = train_dataset.map(train_generator.read,
+                                num_parallel_calls=-1)
+train_dataset = train_dataset.map(train_generator.augment_image,
+                                num_parallel_calls=-1)
+train_dataset = train_dataset.batch(train_size)
 
-print("Loading validation data...")
-val_data, val_answ = load_val_data(dataset_dir, dslr_dir, phone_dir, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE)
-print("Validation data was loaded\n")
 
-VAL_SIZE = val_data.shape[0]
-num_val_batches = int(val_data.shape[0] / batch_size)
 
-gen = dped_resnet(train_data[0].shape)
+
+
+val_generator = image_generator(dataset_dir, dslr_dir, phone_dir, 'val/', PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, triple_exposure, over_dir, under_dir)
+val_dataset = tf.data.Dataset.from_tensor_slices(val_generator.get_list())
+val_dataset = val_dataset.map(val_generator.read,
+                                    num_parallel_calls=-1)
+
+learning_rate = 5e-5
+vgg_dir = 'vgg_pretrained/imagenet-vgg-verydeep-19.mat'
+
+
+gen = dped_resnet(train_generator.size())
+loss_fo = loss_fourier(PATCH_WIDTH, PATCH_HEIGHT)
 gen.compile(
     optimizer = tf.keras.optimizers.Adam(learning_rate),
-    loss = loss_creator(vgg_dir, patch_w, patch_h, 200, 0, 0.5, 300, 2),
-    metrics = 
+    loss = loss_creator(vgg_dir, PATCH_WIDTH, PATCH_WIDTH, 200, 0, 0, 300, 2),
+    metrics = [metr_psnr, loss_fo]
+)
+
+batch_size = 5
+num_train_iters = 300000
+eval_step = 100
+
+tb_callback = tf.keras.callbacks.TensorBoard(log_dir='log/')
+
+
+hist = gen.fit(
+    train_dataset,
+    batch_size = batch_size,
+    epochs = num_train_iters,
+    validation_freq = eval_step,
+    validation_data = val_dataset,
+    callbacks=[tb_callback]
 )
