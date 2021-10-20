@@ -62,8 +62,6 @@ batch_size = 5
 num_train_iters = 300000
 eval_step = 100
 
-tb_callback = tf.keras.callbacks.TensorBoard(log_dir='log/')
-
 
 hist = gen.fit(
     train_dataset,
@@ -71,5 +69,6 @@ hist = gen.fit(
     epochs = num_train_iters,
     validation_freq = eval_step,
     validation_data = val_dataset,
-    callbacks=[tb_callback]
+    workers=-1,
+    use_multiprocessing=True
 )
