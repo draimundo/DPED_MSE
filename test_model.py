@@ -33,7 +33,7 @@ with tf.compat.v1.Session(config=config) as sess:
     time_start = datetime.now()
 
     # Placeholders for test data
-    x_ = tf.compat.v1.placeholder(tf.float32, [1, IMAGE_HEIGHT//2, IMAGE_WIDTH//2, 4])
+    x_ = tf.compat.v1.placeholder(tf.float32, [1, IMAGE_HEIGHT, IMAGE_WIDTH, 4])
 
     # determine model name
     # generate enhanced image
@@ -52,7 +52,7 @@ with tf.compat.v1.Session(config=config) as sess:
     test_photos.sort()
 
     print("Loading images")
-    images = np.zeros((len(test_photos), IMAGE_HEIGHT//2, IMAGE_WIDTH//2, 4))
+    images = np.zeros((len(test_photos), IMAGE_HEIGHT, IMAGE_WIDTH, 4))
     for i, photo in tqdm(enumerate(test_photos)):
         print("Processing image " + photo)
 
@@ -68,7 +68,7 @@ with tf.compat.v1.Session(config=config) as sess:
         
         for i, photo in enumerate(test_photos):
             enhanced_tensor = sess.run(enhanced, feed_dict={x_: [images[i,...]]})
-            enhanced_image = np.reshape(enhanced_tensor, [IMAGE_HEIGHT, IMAGE_WIDTH, 3])
+            enhanced_image = np.reshape(enhanced_tensor, [IMAGE_HEIGHT*DSLR_SCALE, IMAGE_WIDTH*DSLR_SCALE, 3])
 
             # Save the results as .png images
             photo_name = photo.rsplit(".", 1)[0]
