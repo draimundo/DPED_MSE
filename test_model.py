@@ -12,6 +12,7 @@ import rawpy
 from model import resnet
 import utils
 
+from tqdm import tqdm
 from datetime import datetime
 from load_dataset import extract_bayer_channels
 
@@ -22,6 +23,11 @@ DSLR_SCALE = float(1) / (2 ** (max(LEVEL,0) - 1))
 
 # Disable gpu if specified
 config = tf.compat.v1.ConfigProto(device_count={'GPU': 0}) if not use_gpu else None
+
+restore_iters = sorted(list(set([int((model_file.split("_")[-1]).split(".")[0])
+            for model_file in os.listdir(model_dir)
+            if model_file.startswith("resnet_")])))
+
 
 with tf.compat.v1.Session(config=config) as sess:
     time_start = datetime.now()
@@ -35,53 +41,35 @@ with tf.compat.v1.Session(config=config) as sess:
         name_model = "resnet"
         enhanced = resnet(x_)
 
-
     # Determine model weights
     saver = tf.compat.v1.train.Saver()
 
-    if orig_model: # load official pre-trained weights
-        model_dir = "models/original/"
-        name_model_full = name_model + '_pretrained'
-        saver.restore(sess, model_dir + name_model_full + ".ckpt")
-    else:
-        if rand_param: # use random weights
-            name_model_full = name_model
-            global_vars = [v for v in tf.compat.v1.global_variables()]
-            sess.run(tf.compat.v1.global_variables_initializer())
-            saver = tf.compat.v1.train.Saver(var_list=global_vars)
-        else: # load previous/restored pre-trained weights
-            name_model_full = name_model + "_iteration_" + str(restore_iter)
-            saver.restore(sess, model_dir + name_model_full + ".ckpt")
+    # Processing full-resolution RAW images
+    test_dir_full = 'validation_full_resolution_visual_data/mediatek_raw_normal/'
 
-    # Processing test images
-    if test_image:
-        test_dir_full = 'validation_full_resolution_visual_data/mediatek_raw_normal/'
-        test_photos = [f for f in os.listdir(test_dir_full) if os.path.isfile(test_dir_full + f)]
-        test_photos.sort()
-        for photo in test_photos:
+    test_photos = [f for f in os.listdir(test_dir_full) if os.path.isfile(test_dir_full + f)]
+    test_photos.sort()
 
-            print("Processing image " + photo)
-            
-            I = np.asarray(rawpy.imread((test_dir_full + photo)).raw_image.astype(np.float32))
-            I = extract_bayer_channels(I)
+    print("Loading images")
+    images = np.zeros((len(test_photos), IMAGE_HEIGHT, IMAGE_WIDTH, 3))
+    for i, photo in tqdm(enumerate(test_photos)):
+        print("Processing image " + photo)
 
-            I = I[0:IMAGE_HEIGHT//2, 0:IMAGE_WIDTH//2, :]
-            I = np.reshape(I, [1, I.shape[0], I.shape[1], 4])
+        In = np.asarray(rawpy.imread((test_dir_full + photo)).raw_image.astype(np.float32))
+        In = extract_bayer_channels(In)
 
-            # Run inference
-            enhanced_tensor = sess.run(enhanced, feed_dict={x_: I})
-            enhanced_image = np.reshape(enhanced_tensor, [int(I.shape[1] * DSLR_SCALE), int(I.shape[2] * DSLR_SCALE), 3])
+        images[i,...] = In
+    print("Images loaded")
+    # Run inference
+
+    for restore_iter in tqdm(restore_iters):
+        saver.restore(sess, model_dir + "resnet_iteration_" + str(restore_iter) + ".ckpt")
+        
+        for i, photo in enumerate(test_photos):
+            enhanced_tensor = sess.run(enhanced, feed_dict={x_: [images[i,...]]})
+            enhanced_image = np.reshape(enhanced_tensor, [IMAGE_HEIGHT, IMAGE_WIDTH, 3])
 
             # Save the results as .png images
             photo_name = photo.rsplit(".", 1)[0]
-            imageio.imwrite(result_dir + photo_name + "-" + name_model_full + ".png", enhanced_image)            
-
-    print('total test time:', datetime.now() - time_start)
-
-    # save model again (optional, but useful for MAI challenge)
-    if save_model:
-
-        saver.save(sess, model_dir + name_model_full + ".ckpt") # pre-trained weight + meta graph
-        utils.export_pb(sess, 'output_l0', model_dir, name_model_full + ".pb") # frozen graph (i.e. protobuf)
-        tf.compat.v1.summary.FileWriter(model_dir + name_model_full, sess.graph) # tensorboard
-        print('model saved!')
+            imageio.imwrite("results/full-resolution/"+ result_dir + photo_name +
+                        "_iteration_" + str(restore_iter) + ".png", enhanced_image)

@@ -7,6 +7,13 @@ from load_dataset import load_test_data
 from model import resnet
 import utils
 import vgg
+import os
+import sys
+
+
+dataset_dir, test_dir, model_dir, result_dir, arch, LEVEL, inst_norm, num_maps_base,\
+    orig_model, rand_param, restore_iter, IMAGE_HEIGHT, IMAGE_WIDTH, use_gpu, save_model, test_image = \
+        utils.process_test_model_args(sys.argv)
 
 LEVEL = 0
 DSLR_SCALE = float(1) / (2 ** (max(LEVEL,0) - 1))
@@ -18,12 +25,14 @@ TARGET_DEPTH = 3
 TARGET_SIZE = TARGET_WIDTH * TARGET_HEIGHT * TARGET_DEPTH
 
 dataset_dir = 'raw_images/'
-model_dir = 'models/'
 dslr_dir = 'fujifilm/'
 phone_dir = 'mediatek_raw/'
 vgg_dir = 'vgg_pretrained/imagenet-vgg-verydeep-19.mat'
-restore_iter = 84000
-batch_size = 5
+
+restore_iters = sorted(list(set([int((model_file.split("_")[-1]).split(".")[0])
+            for model_file in os.listdir(model_dir)
+            if model_file.startswith("resnet_")])))
+batch_size = 10
 use_gpu = True
 
 print("Loading testing data...")
@@ -43,8 +52,6 @@ with tf.compat.v1.Session(config=config) as sess:
     name_model = "resnet"
     enhanced_ = resnet(phone_)
     saver = tf.compat.v1.train.Saver()
-    name_model_full = name_model + "_iteration_" + str(restore_iter)
-    saver.restore(sess, model_dir + name_model_full + ".ckpt")
 
     ## PSNR loss
     loss_psnr = tf.reduce_mean(tf.image.psnr(enhanced_, dslr_, 1.0))
@@ -70,22 +77,23 @@ with tf.compat.v1.Session(config=config) as sess:
     loss_content = tf.reduce_mean(tf.math.squared_difference(enhanced_vgg[CONTENT_LAYER], dslr_vgg[CONTENT_LAYER]))
     loss_list.append(loss_content)
     loss_text.append("loss_content")
+    for restore_iter in restore_iters:
+        saver.restore(sess, model_dir + "resnet_iteration_" + str(restore_iter) + ".ckpt")
+        test_losses_gen = np.zeros((1, len(loss_text)))
+        for j in tqdm(range(num_test_batches)):
 
-    test_losses_gen = np.zeros((1, len(loss_text)))
-    for j in tqdm(range(num_test_batches)):
+            be = j * batch_size
+            en = (j+1) * batch_size
 
-        be = j * batch_size
-        en = (j+1) * batch_size
+            phone_images = test_data[be:en]
+            dslr_images = test_answ[be:en]
 
-        phone_images = test_data[be:en]
-        dslr_images = test_answ[be:en]
+            losses = sess.run(loss_list, feed_dict={phone_: phone_images, dslr_: dslr_images})
+            test_losses_gen += np.asarray(losses) / num_test_batches
 
-        losses = sess.run(loss_list, feed_dict={phone_: phone_images, dslr_: dslr_images})
-        test_losses_gen += np.asarray(losses) / num_test_batches
-
-logs_gen = "Losses -> "
-for idx, loss in enumerate(loss_text):
-    logs_gen += "%s: %.4g; " % (loss, test_losses_gen[0][idx])
-logs_gen += '\n'
-print(logs_gen)
+        logs_gen = "Losses - iter: " + str(restore_iter) + "-> "
+        for idx, loss in enumerate(loss_text):
+            logs_gen += "%s: %.4g; " % (loss, test_losses_gen[0][idx])
+        logs_gen += '\n'
+        print(logs_gen)
 print('total test time:', datetime.now() - time_start)

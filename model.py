@@ -55,6 +55,18 @@ def adversarial(image_):
     
     return adv_out
 
+def fourierDiscrim(input):
+    with tf.compat.v1.variable_scope("fourierDiscrim"):
+        
+        flat = tf.compat.v1.layers.flatten(input)
+
+        fc1 = _fully_connected_layer(flat, 1024)
+        fc2 = _fully_connected_layer(fc1, 1024)
+        fc3 = _fully_connected_layer(fc2, 1024)
+        fc4 = _fully_connected_layer(fc3, 1024)
+
+        out = tf.nn.softmax(_fully_connected_layer(fc4, 2, relu=False))
+    return out
 
 def weight_variable(shape, name):
 
@@ -142,6 +154,22 @@ def _instance_norm(net):
     normalized = (net-mu)/(sigma_sq + epsilon)**(.5)
 
     return scale * normalized + shift
+
+def _fully_connected_layer(net, num_weights, relu=True):
+    print(net.get_shape())
+    batch, channels = [i for i in net.get_shape()]
+    weights_shape = [channels, num_weights]
+
+    weights = tf.Variable(tf.random.truncated_normal(weights_shape, stddev=0.01, seed=1), dtype=tf.float32)
+    bias = tf.Variable(tf.constant(0.01, shape=[num_weights]))
+
+    out = tf.matmul(net, weights) + bias
+
+    if relu:
+        out = tf.compat.v1.nn.leaky_relu(out)
+
+    return out
+
 
 
 def _conv_init_vars(net, out_channels, filter_size, transpose=False):
