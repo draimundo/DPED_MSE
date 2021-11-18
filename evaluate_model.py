@@ -96,4 +96,9 @@ with tf.compat.v1.Session(config=config) as sess:
             logs_gen += "%s: %.4g; " % (loss, test_losses_gen[0][idx])
         logs_gen += '\n'
         print(logs_gen)
+
+        logs = open(model_dir + "test" + ".txt", "a+")
+        logs.write(logs_gen)
+        logs.write('\n')
+        logs.close()
 print('total test time:', datetime.now() - time_start)
