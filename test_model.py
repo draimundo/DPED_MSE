@@ -41,6 +41,7 @@ with tf.compat.v1.Session(config=config) as sess:
         name_model = "resnet"
         enhanced = resnet(x_)
 
+
     # Determine model weights
     saver = tf.compat.v1.train.Saver()
 
@@ -51,7 +52,7 @@ with tf.compat.v1.Session(config=config) as sess:
     test_photos.sort()
 
     print("Loading images")
-    images = np.zeros((len(test_photos), IMAGE_HEIGHT, IMAGE_WIDTH, 3))
+    images = np.zeros((len(test_photos), IMAGE_HEIGHT//2, IMAGE_WIDTH//2, 4))
     for i, photo in tqdm(enumerate(test_photos)):
         print("Processing image " + photo)
 

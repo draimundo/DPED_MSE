@@ -185,8 +185,8 @@ def process_test_model_args(arguments):
     rand_param = False
     restore_iter = 0
     # --- input size ---
-    img_h = 2976 # default size
-    img_w = 3968 # default size
+    img_h = 1500 # default size
+    img_w = 2000 # default size
     # --- more options ---
     use_gpu = False
     save_model = False
