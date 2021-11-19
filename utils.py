@@ -18,16 +18,11 @@ def process_command_args(arguments):
 
     # --- data path ---
     dataset_dir = 'raw_images/'
-    model_dir = 'models/'
     result_dir = 'results/'
     vgg_dir = 'vgg_pretrained/imagenet-vgg-verydeep-19.mat'
     dslr_dir = 'fujifilm/'
     phone_dir = 'mediatek_raw/'
-    # --- architecture ---
-    arch = "resnet"
-    level = 0
-    inst_norm = False
-    num_maps_base = 16
+    model_dir = 'test/'
     # --- model weights ---
     restore_iter = 0
     # --- input size ---
@@ -38,19 +33,24 @@ def process_command_args(arguments):
     train_size = 5000
     learning_rate = 5e-5
     eval_step = 1000
-    num_train_iters = 200000
+    num_train_iters = 300000
     # --- more options ---
     save_mid_imgs = False
     leaky = True
-    fac_content = 0.5
-    fac_mse = 200
-    fac_ssim = 2
-    fac_color = 200
-    fac_texture = 1
     norm_gen = True
 
-    for args in arguments:
+    default_facs = True
+    fac_mse = 0
+    fac_l1 = 0
+    fac_ssim = 0
+    fac_ms_ssim = 0
+    fac_color = 0
+    fac_vgg = 0
+    fac_texture = 0
+    fac_fourier = 0
+    fac_frequency = 0
 
+    for args in arguments:
         # --- data path ---
         if args.startswith("dataset_dir"):
             dataset_dir = args.split("=")[1]
@@ -118,34 +118,53 @@ def process_command_args(arguments):
         if args.startswith("norm_gen"):
             norm_gen = eval(args.split("=")[1])
 
-        if args.startswith("fac_content"):
-            fac_content = float(args.split("=")[1])
         if args.startswith("fac_mse"):
             fac_mse = float(args.split("=")[1])
+            default_facs = False
+        if args.startswith("fac_l1"):
+            fac_l1 = float(args.split("=")[1])
+            default_facs = False
         if args.startswith("fac_ssim"):
             fac_ssim = float(args.split("=")[1])
+            default_facs = False
+        if args.startswith("fac_ms_ssim"):
+            fac_ms_ssim = float(args.split("=")[1])
+            default_facs = False
         if args.startswith("fac_color"):
             fac_color = float(args.split("=")[1])
+            default_facs = False
+        if args.startswith("fac_vgg"):
+            fac_vgg = float(args.split("=")[1])
+            default_facs = False
         if args.startswith("fac_texture"):
             fac_texture = float(args.split("=")[1])
+            default_facs = False
+        if args.startswith("fac_fourier"):
+            fac_fourier = float(args.split("=")[1])
+            default_facs = False
+        if args.startswith("fac_frequency"):
+            fac_frequency = float(args.split("=")[1])
+            default_facs = False
 
-    # choose architecture
-    if arch == "resnet":
-        name_model = "resnet"
+    if default_facs:
+        fac_vgg = 0.5
+        fac_mse = 200
+        fac_ssim = 2
+        fac_color = 200
+        fac_texture = 1
 
     # obtain restore iteration info
     if not os.path.isdir(model_dir):
         os.mkdir(model_dir)
     
-    if restore_iter is None: # no need to get the last iteration if specified
-        restore_iter = get_last_iter(model_dir, name_model)
+    if restore_iter == 0: # no need to get the last iteration if specified
+        restore_iter = get_last_iter(model_dir, "DPED")
 
     if num_train_iters is None:
         num_train_iters = NUM_DEFAULT_TRAIN_ITERS[level]
+    num_train_iters += restore_iter
 
     print("The following parameters will be applied for training:")
-
-    print("Model architecture: " + arch)
     print("Restore Iteration: " + str(restore_iter))
     print("Batch size: " + str(batch_size))
     print("Training size: " + str(train_size))
@@ -158,12 +177,20 @@ def process_command_args(arguments):
     print("Path to VGG-19 network: " + vgg_dir)
     print("Path to RGB data from DSLR: " + dslr_dir)
     print("Path to Raw data from phone: " + phone_dir)
-    print("Loss function=" + " content:" + str(fac_content) + " +MSE:" + str(fac_mse) + " +SSIM:" + str(fac_ssim) + " +color:" + str(fac_color) + " +texture:" + str(fac_texture))
-
-    return dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir,\
-        arch, level, inst_norm, num_maps_base, restore_iter, patch_w, patch_h,\
-            batch_size, train_size, learning_rate, eval_step, num_train_iters, save_mid_imgs, \
-                leaky, norm_gen, fac_content, fac_mse, fac_ssim, fac_color, fac_texture
+    print("Loss function=" +
+        " mse:" + str(fac_mse) +
+        " l1:" + str(fac_l1) +
+        " ssim:" + str(fac_ssim) +
+        " ms-ssim:" + str(fac_ms_ssim) +
+        " color:" + str(fac_color) +
+        " vgg:" + str(fac_vgg) +
+        " texture:" + str(fac_texture) +
+        " fourier:" + str(fac_fourier) + 
+        " frequency:" + str(fac_frequency) )
+    return dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir, restore_iter,\
+        patch_w, patch_h, batch_size, train_size, learning_rate, eval_step, num_train_iters, \
+        save_mid_imgs, leaky, norm_gen, \
+        fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency
 
 
 def process_test_model_args(arguments):
@@ -282,7 +309,7 @@ def get_last_iter(model_dir, name_model):
     if len(saved_models) > 0:
         return np.max(saved_models)
     else:
-        return -1
+        return 0
 
 
 def log10(x):
