@@ -50,33 +50,49 @@ with tf.compat.v1.Session(config=config) as sess:
     dslr_ = tf.compat.v1.placeholder(tf.float32, [batch_size, TARGET_HEIGHT, TARGET_WIDTH, TARGET_DEPTH])
 
     name_model = "resnet"
-    enhanced_ = resnet(phone_)
+    enhanced = resnet(phone_)
     saver = tf.compat.v1.train.Saver()
 
+    dslr_gray = tf.image.rgb_to_grayscale(dslr_)
+    enhanced_gray = tf.image.rgb_to_grayscale(dslr_)
+
     ## PSNR loss
-    loss_psnr = tf.reduce_mean(tf.image.psnr(enhanced_, dslr_, 1.0))
+    loss_psnr = tf.reduce_mean(tf.image.psnr(enhanced, dslr_, 1.0))
     loss_list = [loss_psnr]
     loss_text = ["loss_psnr"]
 
+    ## L1 loss
+    loss_l1 = tf.reduce_mean(tf.abs(tf.math.subtract(enhanced, dslr_)))
+    loss_list.append(loss_l1)
+    loss_text.append("loss_l1")
+
     ## Color loss
-    enhanced_blur = utils.blur(enhanced_)
-    dslr_blur = utils.blur(dslr_)
-    loss_color = tf.reduce_mean(tf.math.squared_difference(dslr_blur, enhanced_blur))
-    loss_list.append(loss_color)
-    loss_text.append("loss_color")
+    # enhanced_blur = utils.blur(enhanced)
+    # dslr_blur = utils.blur(dslr_)
+    # loss_color = tf.reduce_mean(tf.math.squared_difference(dslr_blur, enhanced_blur))
+    # loss_list.append(loss_color)
+    # loss_text.append("loss_color")
 
     ## SSIM loss
-    loss_ssim = tf.reduce_mean(tf.image.ssim(enhanced_, dslr_, 1.0))
+    loss_ssim = 1 - tf.reduce_mean(tf.image.ssim(enhanced_gray, dslr_gray, 1.0))
     loss_list.append(loss_ssim)
     loss_text.append("loss_ssim")
 
+    # MS-SSIM loss
+    loss_ms_ssim = 1 - tf.reduce_mean(tf.image.ssim_multiscale(enhanced_gray, dslr_gray, 1.0))
+    loss_list.append(loss_ms_ssim)
+    loss_text.append("loss_ms_ssim")
+
     ## Content loss
     CONTENT_LAYER = 'relu5_4'
-    enhanced_vgg = vgg.net(vgg_dir, vgg.preprocess(enhanced_ * 255))
+    enhanced_vgg = vgg.net(vgg_dir, vgg.preprocess(enhanced * 255))
     dslr_vgg = vgg.net(vgg_dir, vgg.preprocess(dslr_ * 255))
     loss_content = tf.reduce_mean(tf.math.squared_difference(enhanced_vgg[CONTENT_LAYER], dslr_vgg[CONTENT_LAYER]))
     loss_list.append(loss_content)
     loss_text.append("loss_content")
+
+
+
     for restore_iter in restore_iters:
         saver.restore(sess, model_dir + "resnet_iteration_" + str(restore_iter) + ".ckpt")
         test_losses_gen = np.zeros((1, len(loss_text)))
