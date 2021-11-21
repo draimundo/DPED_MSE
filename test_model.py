@@ -41,7 +41,7 @@ config = tf.compat.v1.ConfigProto(device_count={'GPU': 0}) if not use_gpu else N
 
 restore_iters = sorted(list(set([int((model_file.split("_")[-1]).split(".")[0])
             for model_file in os.listdir(model_dir)
-            if model_file.startswith("resnet_")])))
+            if model_file.startswith("DPED_")])))
 
 
 with tf.compat.v1.Session(config=config) as sess:
