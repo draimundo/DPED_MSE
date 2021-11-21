@@ -4,7 +4,7 @@ from datetime import datetime
 from tqdm import tqdm
 
 from load_dataset import load_test_data
-from model import resnet
+from model import dped_g
 import utils
 import vgg
 import os
@@ -31,7 +31,7 @@ vgg_dir = 'vgg_pretrained/imagenet-vgg-verydeep-19.mat'
 
 restore_iters = sorted(list(set([int((model_file.split("_")[-1]).split(".")[0])
             for model_file in os.listdir(model_dir)
-            if model_file.startswith("resnet_")])))
+            if model_file.startswith("DPED_")])))
 batch_size = 10
 use_gpu = True
 
@@ -49,8 +49,7 @@ with tf.compat.v1.Session(config=config) as sess:
     phone_ = tf.compat.v1.placeholder(tf.float32, [batch_size, PATCH_HEIGHT, PATCH_WIDTH, 4])
     dslr_ = tf.compat.v1.placeholder(tf.float32, [batch_size, TARGET_HEIGHT, TARGET_WIDTH, TARGET_DEPTH])
 
-    name_model = "resnet"
-    enhanced = resnet(phone_)
+    enhanced = dped_g(phone_)
     saver = tf.compat.v1.train.Saver()
 
     dslr_gray = tf.image.rgb_to_grayscale(dslr_)

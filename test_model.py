@@ -9,7 +9,7 @@ import sys
 import os
 import rawpy
 
-from model import resnet
+from model import dped_g
 import utils
 
 from tqdm import tqdm
@@ -50,11 +50,9 @@ with tf.compat.v1.Session(config=config) as sess:
     # Placeholders for test data
     x_ = tf.compat.v1.placeholder(tf.float32, [1, PATCH_HEIGHT, PATCH_WIDTH, PATCH_DEPTH])
 
-    # determine model name
+
     # generate enhanced image
-    if arch == "resnet":
-        name_model = "resnet"
-        enhanced = resnet(x_)
+    enhanced = dped_g(x_)
 
 
     # Determine model weights
