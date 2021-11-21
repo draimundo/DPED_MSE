@@ -42,6 +42,7 @@ config = tf.compat.v1.ConfigProto(device_count={'GPU': 0}) if not use_gpu else N
 restore_iters = sorted(list(set([int((model_file.split("_")[-1]).split(".")[0])
             for model_file in os.listdir(model_dir)
             if model_file.startswith("DPED_")])))
+restore_iters = reversed(restore_iters)
 
 
 with tf.compat.v1.Session(config=config) as sess:
@@ -77,7 +78,7 @@ with tf.compat.v1.Session(config=config) as sess:
     # Run inference
 
     for restore_iter in tqdm(restore_iters):
-        saver.restore(sess, model_dir + "resnet_iteration_" + str(restore_iter) + ".ckpt")
+        saver.restore(sess, model_dir + "DPED_iteration_" + str(restore_iter) + ".ckpt")
         
         for i, photo in enumerate(test_photos):
             enhanced_tensor = sess.run(enhanced, feed_dict={x_: [images[i,...]]})
