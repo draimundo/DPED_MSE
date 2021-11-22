@@ -216,7 +216,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     loss_dped_g_ = 0.0
     if fac_texture > 0:
         loss_texture_g_ = 0.0
-        loss_texture_d_ = 0.0
+        n_texture_d_ = 0.0
     
     for i in tqdm(range(iter_start, num_train_iters + 1), miniters=100):
         # Train discriminator
@@ -230,7 +230,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
 
             if loss_g < 2*loss_d:
                 [loss_temp, temp] = sess.run([loss_texture_d, train_step_texture_d], feed_dict=feed_texture_d)
-                loss_texture_d_ += loss_temp / eval_step
+                n_texture_d_ += 1
 
         # Train generator
         idx_g = np.random.randint(0, train_size, batch_size)
@@ -277,7 +277,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
             for idx, loss in enumerate(loss_text):
                 logs_gen += "%s: %.4g; " % (loss, val_losses_g[0][idx])
             if fac_texture > 0:
-                logs_gen += "\n | texture_d loss: %.4g" % (val_loss_texture_d)
+                logs_gen += "\n | texture_d loss: %.4g; n_texture_d: %.4g" % (val_loss_texture_d, n_texture_d_)
 
             print(logs_gen)
 
@@ -305,7 +305,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
 
             loss_dped_g_ = 0.0
             if fac_texture > 0:
-                loss_texture_d_ = 0.0
+                n_texture_d_ = 0.0
 
 
         # Loading new training data
