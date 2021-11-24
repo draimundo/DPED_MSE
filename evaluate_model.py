@@ -1,3 +1,4 @@
+import re
 import tensorflow as tf
 import numpy as np
 from datetime import datetime
@@ -9,6 +10,8 @@ import utils
 import vgg
 import os
 import sys
+
+import niqe
 
 
 dataset_dir, test_dir, model_dir, result_dir, arch, LEVEL, inst_norm, num_maps_base,\
@@ -28,11 +31,13 @@ dataset_dir = 'raw_images/'
 dslr_dir = 'fujifilm/'
 phone_dir = 'mediatek_raw/'
 vgg_dir = 'vgg_pretrained/imagenet-vgg-verydeep-19.mat'
-
-restore_iters = sorted(list(set([int((model_file.split("_")[-1]).split(".")[0])
-            for model_file in os.listdir(model_dir)
-            if model_file.startswith("DPED_")])))
-restore_iters = reversed(restore_iters)
+if restore_iter == 0:
+    restore_iters = sorted(list(set([int((model_file.split("_")[-1]).split(".")[0])
+                for model_file in os.listdir(model_dir)
+                if model_file.startswith("DPED_")])))
+    restore_iters = reversed(restore_iters)
+else:
+    restore_iters = [restore_iter]
 batch_size = 10
 use_gpu = True
 
@@ -90,12 +95,14 @@ with tf.compat.v1.Session(config=config) as sess:
     loss_content = tf.reduce_mean(tf.math.squared_difference(enhanced_vgg[CONTENT_LAYER], dslr_vgg[CONTENT_LAYER]))
     loss_list.append(loss_content)
     loss_text.append("loss_content")
+    
+    niqe = niqe.create_evaluator()
 
-
-
-    for restore_iter in restore_iters:
+    control_niqe = 0.0
+    for i, restore_iter in enumerate(restore_iters):
         saver.restore(sess, model_dir + "DPED_iteration_" + str(restore_iter) + ".ckpt")
         test_losses_gen = np.zeros((1, len(loss_text)))
+        metric_niqe = 0.0
         for j in tqdm(range(num_test_batches)):
 
             be = j * batch_size
@@ -104,12 +111,17 @@ with tf.compat.v1.Session(config=config) as sess:
             phone_images = test_data[be:en]
             dslr_images = test_answ[be:en]
 
-            losses = sess.run(loss_list, feed_dict={phone_: phone_images, dslr_: dslr_images})
+            [losses, enhanced_images] = sess.run([loss_list, enhanced], feed_dict={phone_: phone_images, dslr_: dslr_images})
             test_losses_gen += np.asarray(losses) / num_test_batches
+
+            metric_niqe += niqe.evaluate(enhanced_images, enhanced_images) / num_test_batches
+            if i == 0:
+                control_niqe += niqe.evaluate(dslr_images, dslr_images) / num_test_batches
 
         logs_gen = "Losses - iter: " + str(restore_iter) + "-> "
         for idx, loss in enumerate(loss_text):
-            logs_gen += "%s: %.4g; " % (loss, test_losses_gen[0][idx])
+            logs_gen += "%s: %.6g; " % (loss, test_losses_gen[0][idx])
+        logs_gen += "niqe: %.6g; control-niqe: %.6g" % (metric_niqe, control_niqe)
         logs_gen += '\n'
         print(logs_gen)
 
