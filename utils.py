@@ -190,7 +190,8 @@ def process_command_args(arguments):
         " vgg:" + str(fac_vgg) +
         " texture:" + str(fac_texture) +
         " fourier:" + str(fac_fourier) + 
-        " frequency:" + str(fac_frequency) )
+        " frequency:" + str(fac_frequency) +
+        " lpips:" + str(fac_lpips) )
     return dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir, restore_iter,\
         patch_w, patch_h, batch_size, train_size, learning_rate, eval_step, num_train_iters, \
         save_mid_imgs, leaky, norm_gen, \
