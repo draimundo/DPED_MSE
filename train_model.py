@@ -12,6 +12,8 @@ from load_dataset import load_train_patch, load_val_data
 from model import dped_g, fourier_d, texture_d
 import utils
 import vgg
+import lpips_tf
+
 
 from tqdm import tqdm
 from skimage.filters import window
@@ -21,7 +23,7 @@ from skimage.filters import window
 dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir, restore_iter,\
 patch_w, patch_h, batch_size, train_size, learning_rate, eval_step, num_train_iters, \
 save_mid_imgs, leaky, norm_gen, \
-fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency \
+fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips \
     = utils.process_command_args(sys.argv)
 
 # Defining the size of the input and target image patches
@@ -161,6 +163,13 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     #     loss_generator += loss_frequency * fac_frequency
     #     loss_list.append(loss_frequency)
     #     loss_text.append("loss_frequency")
+
+    ## LPIPS
+    if fac_lpips > 0:
+        loss_lpips = tf.reduce_mean(lpips_tf.lpips(enhanced, dslr_, net='alex'))
+        loss_generator += loss_lpips * fac_lpips
+        loss_list.append(loss_lpips)
+        loss_text.append("loss_lpips")
 
     ## Final loss function
     loss_list.insert(0, loss_generator)
