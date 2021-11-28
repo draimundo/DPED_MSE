@@ -42,11 +42,13 @@ config = tf.compat.v1.ConfigProto(device_count={'GPU': 0}) if not use_gpu else N
 if not os.path.isdir("results/full-resolution/"+ result_dir):
     os.makedirs("results/full-resolution/"+ result_dir, exist_ok=True)
 
-restore_iters = sorted(list(set([int((model_file.split("_")[-1]).split(".")[0])
+if restore_iter == 0:
+    restore_iters = sorted(list(set([int((model_file.split("_")[-1]).split(".")[0])
             for model_file in os.listdir(model_dir)
             if model_file.startswith("DPED_")])))
-restore_iters = reversed(restore_iters)
-
+    restore_iters = reversed(restore_iters)
+else:
+    restore_iters = [restore_iter]
 
 with tf.compat.v1.Session(config=config) as sess:
     time_start = datetime.now()

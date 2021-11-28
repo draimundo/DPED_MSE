@@ -165,11 +165,12 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     #     loss_text.append("loss_frequency")
 
     ## LPIPS
+    loss_lpips = tf.reduce_mean(lpips_tf.lpips(enhanced, dslr_, net='alex'))
+    loss_list.append(loss_lpips)
+    loss_text.append("loss_lpips")
     if fac_lpips > 0:
-        loss_lpips = tf.reduce_mean(lpips_tf.lpips(enhanced, dslr_, net='alex'))
         loss_generator += loss_lpips * fac_lpips
-        loss_list.append(loss_lpips)
-        loss_text.append("loss_lpips")
+
 
     ## Final loss function
     loss_list.insert(0, loss_generator)
@@ -226,6 +227,12 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     if fac_texture > 0:
         loss_texture_g_ = 0.0
         n_texture_d_ = 0.0
+
+    maxPSNR = 0.0
+    rndPSNR = 0
+
+    minLPIPS = 0.0
+    rndLPIPS = 0
     
     for i in tqdm(range(iter_start, num_train_iters + 1), miniters=100):
         # Train discriminator
@@ -286,7 +293,15 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
             for idx, loss in enumerate(loss_text):
                 logs_gen += "%s: %.4g; " % (loss, val_losses_g[0][idx])
             if fac_texture > 0:
-                logs_gen += "\n | texture_d loss: %.4g; n_texture_d: %.4g" % (val_loss_texture_d, n_texture_d_)
+                logs_gen += " | texture_d loss: %.4g; n_texture_d: %.4g" % (val_loss_texture_d, n_texture_d_)
+
+            if maxPSNR < val_losses_g[0][loss_list.index("metric_psnr")]:
+                maxPSNR = val_losses_g[0][loss_list.index("metric_psnr")]
+                logs_gen += "\n max PSNR!"
+
+            if minLPIPS < val_losses_g[0][loss_list.index("loss_lpips")]:
+                minLPIPS = val_losses_g[0][loss_list.index("loss_lpips")]
+                logs_gen += "\n min LPIPS!"
 
             print(logs_gen)
 
