@@ -295,12 +295,12 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
             if fac_texture > 0:
                 logs_gen += " | texture_d loss: %.4g; n_texture_d: %.4g" % (val_loss_texture_d, n_texture_d_)
 
-            if maxPSNR < val_losses_g[0][loss_list.index("metric_psnr")]:
-                maxPSNR = val_losses_g[0][loss_list.index("metric_psnr")]
+            if maxPSNR < val_losses_g[0][loss_text.index("metric_psnr")]:
+                maxPSNR = val_losses_g[0][loss_text.index("metric_psnr")]
                 logs_gen += "\n max PSNR!"
 
-            if minLPIPS < val_losses_g[0][loss_list.index("loss_lpips")]:
-                minLPIPS = val_losses_g[0][loss_list.index("loss_lpips")]
+            if minLPIPS < val_losses_g[0][loss_text.index("loss_lpips")]:
+                minLPIPS = val_losses_g[0][loss_text.index("loss_lpips")]
                 logs_gen += "\n min LPIPS!"
 
             print(logs_gen)
