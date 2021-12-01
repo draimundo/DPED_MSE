@@ -124,13 +124,14 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     ## Fourier losses (normal and adversarial)
     h2d = np.float32(window('hann', (TARGET_WIDTH, TARGET_HEIGHT)))
     hann2d = tf.stack([h2d,h2d,h2d],axis=2) #stack for 3 color channels
+
     enhanced_filter = tf.cast(tf.multiply(enhanced, hann2d),tf.float32)
-    dslr_filter = tf.cast(tf.multiply(enhanced, hann2d),tf.float32)
+
+    dslr_filter = tf.cast(tf.multiply(dslr_, hann2d),tf.float32)
 
     # from NHWC to NCHW and back, rfft2d performed on 2 innermost dimensions
     enhanced_fft = tf.signal.rfft2d(tf.transpose(enhanced_filter, [0, 3, 1, 2]))
     enhanced_fft = tf.transpose(enhanced_fft,[0,2,3,1])
-    
     enhanced_abs = tf.abs(enhanced_fft)
     enhanced_angle = tf.math.angle(enhanced_fft)
 
