@@ -14,7 +14,6 @@ import utils
 import vgg
 import lpips_tf
 
-
 from tqdm import tqdm
 from skimage.filters import window
 
@@ -118,51 +117,48 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
         loss_texture_g = -tf.reduce_mean(tf.math.log(tf.clip_by_value(tf.nn.sigmoid(pred_fake - pred_real), 1e-10, 1.0)))
         loss_texture_d = -tf.reduce_mean(tf.math.log(tf.clip_by_value(tf.nn.sigmoid(pred_real - pred_fake), 1e-10, 1.0)))
 
-        # enhanced_gray_res = tf.reshape(enhanced_gray, [-1, TARGET_WIDTH * TARGET_HEIGHT]) # reshape needed for multiplication with adv_
-        # dslr_gray_res = tf.reshape(dslr_gray,[-1, TARGET_WIDTH * TARGET_HEIGHT])
-        # adv_ = tf.compat.v1.placeholder(tf.float32, [None, 1]) # adv_ = 1 -> real image
-        # adversarial_ = tf.multiply(enhanced_gray_res, 1 - adv_) + tf.multiply(dslr_gray_res, adv_)
-        # adversarial_image = tf.reshape(adversarial_, [-1, TARGET_HEIGHT, TARGET_WIDTH, 1]) # reshape to 2d monochrome image
-        # discrim_predictions = dped_d(adversarial_image)
-        # discrim_target = tf.concat([adv_, 1 - adv_], 1)
-        # loss_discrim = -tf.reduce_mean(discrim_target * tf.math.log(tf.clip_by_value(discrim_predictions, 1e-10, 1.0)))
-        # loss_texture = -loss_discrim
-        # correct_predictions = tf.equal(tf.argmax(discrim_predictions, 1), tf.argmax(discrim_target, 1))
-        # discim_accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32))
-
         loss_generator += loss_texture_g * fac_texture
         loss_list.append(loss_texture_g)
         loss_text.append("loss_texture")
 
-    # ## Fourier losses (normal and adversarial)
-    # h2d = np.float32(window('hann', (TARGET_WIDTH, TARGET_HEIGHT)))
-    # hann2d = tf.stack([h2d,h2d,h2d],axis=2) #stack for 3 color channels
-    # enhanced_filter = tf.cast(tf.multiply(enhanced, hann2d),tf.complex64)
-    # dslr_filter = tf.cast(tf.multiply(enhanced, hann2d),tf.complex64)
-    # enhanced_fft = tf.signal.fft2d(tf.transpose(enhanced_filter, [0, 3, 1, 2]))
-    # dslr_fft = tf.signal.fft2d(tf.transpose(dslr_filter, [0, 3, 1, 2]))
-    # loss_fourier = 1/2 * tf.reduce_mean(tf.abs(tf.abs(enhanced_fft)-tf.abs(dslr_fft))) + \
-    #             1/2 * tf.reduce_mean(tf.abs(tf.math.angle(enhanced_fft)-tf.math.angle(dslr_fft)))
-    # if fac_fourier > 0:
-    #     loss_generator += loss_fourier * fac_fourier
-    #     loss_list.append(loss_fourier)
-    #     loss_text.append("loss_fourier")
+    ## Fourier losses (normal and adversarial)
+    h2d = np.float32(window('hann', (TARGET_WIDTH, TARGET_HEIGHT)))
+    hann2d = tf.stack([h2d,h2d,h2d],axis=2) #stack for 3 color channels
+    enhanced_filter = tf.cast(tf.multiply(enhanced, hann2d),tf.float32)
+    dslr_filter = tf.cast(tf.multiply(enhanced, hann2d),tf.float32)
 
-    # if fac_frequency > 0:
-    #     enhanced_fft = tf.transpose(enhanced_fft,[0,2,3,1])
-    #     dslr_fft = tf.transpose(dslr_fft,[0,2,3,1])
-    #     adv_fourier = tf.compat.v1.placeholder(tf.complex64, [None, 1])
-    #     adversarial_fourier = tf.multiply(enhanced_fft, 1 - adv_fourier) + tf.multiply(dslr_fft, adv_fourier)
-    #     adversarial_fourier_image = tf.reshape(adversarial_fourier, [-1, TARGET_HEIGHT, TARGET_WIDTH, -1])
-    #     discrim_fourier_predictions = fourier_d(adversarial_fourier)
-    #     discrim_fourier_target = tf.concat([adv_fourier, 1 - adv_fourier], 1)
-    #     loss_discrim_fourier = -tf.reduce_mean(discrim_fourier_target * tf.math.log(tf.clip_by_value(discrim_fourier_predictions, 1e-10, 1.0)))
-    #     loss_frequency = -loss_discrim_fourier
-    #     correct_predictions_fourier = tf.equal(tf.argmax(discrim_fourier_predictions, 1), tf.argmax(discrim_fourier_target, 1))
-    #     discim_accuracy_fourier = tf.reduce_mean(tf.cast(correct_predictions_fourier, tf.float32))
-    #     loss_generator += loss_frequency * fac_frequency
-    #     loss_list.append(loss_frequency)
-    #     loss_text.append("loss_frequency")
+    # from NHWC to NCHW and back, rfft2d performed on 2 innermost dimensions
+    enhanced_fft = tf.signal.rfft2d(tf.transpose(enhanced_filter, [0, 3, 1, 2]))
+    enhanced_fft = tf.transpose(enhanced_fft,[0,2,3,1])
+    
+    enhanced_abs = tf.abs(enhanced_fft)
+    enhanced_angle = tf.math.angle(enhanced_fft)
+
+    dslr_fft = tf.signal.rfft2d(tf.transpose(dslr_filter, [0, 3, 1, 2]))
+    dslr_fft = tf.transpose(dslr_fft,[0,2,3,1])
+    dslr_abs = tf.abs(dslr_fft)
+    dslr_angle = tf.math.angle(dslr_fft)
+
+    if fac_fourier > 0:
+        loss_fourier = 1/2 * tf.reduce_mean(tf.abs(enhanced_abs - dslr_abs)) + \
+                       1/2 * tf.reduce_mean(tf.abs(enhanced_angle - dslr_angle))
+        loss_generator += loss_fourier * fac_fourier
+        loss_list.append(loss_fourier)
+        loss_text.append("loss_fourier")
+
+    if fac_frequency > 0:
+        frequency_real = tf.stack([dslr_abs, dslr_angle], axis=2)
+        frequency_fake = tf.stack([enhanced_abs, enhanced_angle], axis=2)
+        
+        frequency_pred_real = fourier_d(frequency_real, activation=False)
+        frequency_pred_fake = fourier_d(frequency_fake, activation=False)
+
+        loss_frequency_g = -tf.reduce_mean(tf.math.log(tf.clip_by_value(tf.nn.sigmoid(frequency_pred_fake - frequency_pred_real), 1e-10, 1.0)))
+        loss_frequency_d = -tf.reduce_mean(tf.math.log(tf.clip_by_value(tf.nn.sigmoid(frequency_pred_real - frequency_pred_fake), 1e-10, 1.0)))
+
+        loss_generator += loss_frequency_g * fac_frequency
+        loss_list.append(loss_frequency_g)
+        loss_text.append("loss_frequency")
 
     ## LPIPS
     loss_lpips = tf.reduce_mean(lpips_tf.lpips(enhanced, dslr_, net='alex'))
@@ -182,12 +178,11 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
 
     if fac_texture > 0:
         vars_texture_d = [v for v in tf.compat.v1.global_variables() if v.name.startswith("texture_d")]
-        train_step_texture_d = tf.compat.v1.train.AdamOptimizer(learning_rate/100.0).minimize(loss_texture_d, var_list=vars_texture_d)
+        train_step_texture_d = tf.compat.v1.train.AdamOptimizer(learning_rate/1000.0).minimize(loss_texture_d, var_list=vars_texture_d)
 
-    # if fac_frequency > 0:
-    #     fourier_vars = [v for v in tf.compat.v1.global_variables() if v.name.startswith("fourierDiscrim")]
-    #     train_step_fourier = tf.compat.v1.train.AdamOptimizer(learning_rate).minimize(loss_discrim_fourier, var_list=fourier_vars)
-    #     all_zeros = np.reshape(np.zeros((batch_size, 1)), [batch_size, 1])
+    if fac_frequency > 0:
+        vars_frequency_d = [v for v in tf.compat.v1.global_variables() if v.name.startswith("fourier_d")]
+        train_step_frequency_d = tf.compat.v1.train.AdamOptimizer(learning_rate/1000.0).minimize(loss_frequency_d, var_list=vars_frequency_d)
 
     # Initialize and restore the variables
     print("Initializing variables...")
@@ -227,15 +222,16 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     if fac_texture > 0:
         loss_texture_g_ = 0.0
         n_texture_d_ = 0.0
+    if fac_frequency > 0:
+        loss_frequency_g_ = 0.0
+        n_frequency_d_ = 0.0
 
     maxPSNR = 0.0
-    rndPSNR = 0
-
     minLPIPS = 0.0
-    rndLPIPS = 0
+  
     
     for i in tqdm(range(iter_start, num_train_iters + 1), miniters=100):
-        # Train discriminator
+        # Train texture discriminator
         if fac_texture > 0:
             idx_texture_d = np.random.randint(0, train_size, batch_size)
             phone_texture_d = train_data[idx_texture_d]
@@ -244,9 +240,23 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
             feed_texture_d = {phone_: phone_texture_d, dslr_: dslr_texture_d}
             [loss_g, loss_d] = sess.run([loss_texture_g, loss_texture_d], feed_dict=feed_texture_d)
 
-            if loss_g < 2*loss_d:
+            if loss_g < 3*loss_d:
                 [loss_temp, temp] = sess.run([loss_texture_d, train_step_texture_d], feed_dict=feed_texture_d)
                 n_texture_d_ += 1
+
+        # Train frequency discriminator
+        if fac_frequency > 0:
+            idx_frequency_d = np.random.randint(0, train_size, batch_size)
+            phone_frequency_d = train_data[idx_frequency_d]
+            dslr_frequency_d = train_answ[idx_frequency_d]
+
+            feed_frequency_d = {phone_: phone_frequency_d, dslr_: dslr_frequency_d}
+            [loss_g, loss_d] = sess.run([loss_frequency_g, loss_frequency_d], feed_dict=feed_frequency_d)
+
+            if loss_g < 3*loss_d:
+                [loss_temp, temp] = sess.run([loss_frequency_d, train_step_frequency_d], feed_dict=feed_frequency_d)
+                n_frequency_d_ += 1
+
 
         # Train generator
         idx_g = np.random.randint(0, train_size, batch_size)
@@ -271,6 +281,8 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
             val_losses_g = np.zeros((1, len(loss_text)))
             if fac_texture > 0:
                 val_loss_texture_d = 0.0
+            if fac_frequency > 0:
+                val_loss_frequency_d = 0.0
 
             for j in range(num_val_batches):
                 be = j * batch_size
@@ -288,18 +300,23 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
                 if fac_texture > 0:
                     loss_temp = sess.run(loss_texture_d, feed_dict=valdict)
                     val_loss_texture_d += loss_temp / num_val_batches
+                if fac_frequency > 0:
+                    loss_temp = sess.run(loss_frequency_d, feed_dict=valdict)
+                    val_loss_frequency_d += loss_temp / num_val_batches
 
             logs_gen = "step %d | training: %.4g,  "  % (i, loss_dped_g_)
             for idx, loss in enumerate(loss_text):
                 logs_gen += "%s: %.4g; " % (loss, val_losses_g[0][idx])
             if fac_texture > 0:
                 logs_gen += " | texture_d loss: %.4g; n_texture_d: %.4g" % (val_loss_texture_d, n_texture_d_)
+            if fac_frequency > 0:
+                logs_gen += " | frequency_d loss: %.4g; n_frequency_d: %.4g" % (val_loss_frequency_d, n_frequency_d_)
 
             if maxPSNR < val_losses_g[0][loss_text.index("metric_psnr")]:
                 maxPSNR = val_losses_g[0][loss_text.index("metric_psnr")]
                 logs_gen += "\n max PSNR!"
 
-            if minLPIPS < val_losses_g[0][loss_text.index("loss_lpips")]:
+            if minLPIPS > val_losses_g[0][loss_text.index("loss_lpips")]:
                 minLPIPS = val_losses_g[0][loss_text.index("loss_lpips")]
                 logs_gen += "\n min LPIPS!"
 

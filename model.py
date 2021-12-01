@@ -50,7 +50,7 @@ def texture_d(image_, activation=True):
     
     return adv_out
 
-def fourier_d(input):
+def fourier_d(input, activation=True):
     with tf.compat.v1.variable_scope("fourier_d"):
         
         flat = tf.compat.v1.layers.flatten(input)
@@ -60,7 +60,10 @@ def fourier_d(input):
         fc3 = _fully_connected_layer(fc2, 1024)
         fc4 = _fully_connected_layer(fc3, 1024)
 
-        out = tf.nn.softmax(_fully_connected_layer(fc4, 2, relu=False))
+        out = _fully_connected_layer(fc4, 2, relu=False)
+        if activation:
+            out = tf.nn.softmax(out)
+
     return out
 
 def weight_variable(shape, name):
