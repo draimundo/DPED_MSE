@@ -107,7 +107,7 @@ with tf.compat.v1.Session(config=config) as sess:
     loss_text.append("loss_lpips")
     
     ## Huber loss
-    loss_huber = tf.reduce_mean(tf.compat.v1.losses.huber_loss(enhanced, dslr_), reduction=None)
+    loss_huber = tf.reduce_mean(tf.compat.v1.losses.huber_loss(enhanced, dslr_, reduction=None))
     loss_list.append(loss_huber)
     loss_list.append("loss_huber")
 
