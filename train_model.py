@@ -22,7 +22,7 @@ from skimage.filters import window
 dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir, restore_iter,\
 patch_w, patch_h, batch_size, train_size, learning_rate, eval_step, num_train_iters, \
 save_mid_imgs, leaky, norm_gen, \
-fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips \
+fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips, fac_huber \
     = utils.process_command_args(sys.argv)
 
 # Defining the size of the input and target image patches
@@ -96,6 +96,13 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
         loss_list.append(loss_color)
         loss_text.append("loss_color")
 
+    # Huber loss
+    loss_huber = tf.reduce_mean(tf.compat.v1.losses.huber_loss(enhanced, dslr_), reduction=None)
+    if fac_huber > 0:
+        loss_generator += loss_huber * fac_huber
+        loss_list.append(loss_huber)
+        loss_list.append("loss_huber")
+
     # Content loss
     CONTENT_LAYER = 'relu5_4'
     enhanced_vgg = vgg.net(vgg_dir, vgg.preprocess(enhanced * 255))
@@ -126,7 +133,6 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     hann2d = tf.stack([h2d,h2d,h2d],axis=2) #stack for 3 color channels
 
     enhanced_filter = tf.cast(tf.multiply(enhanced, hann2d),tf.float32)
-
     dslr_filter = tf.cast(tf.multiply(dslr_, hann2d),tf.float32)
 
     # from NHWC to NCHW and back, rfft2d performed on 2 innermost dimensions
@@ -348,7 +354,8 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
             loss_dped_g_ = 0.0
             if fac_texture > 0:
                 n_texture_d_ = 0.0
-
+            if fac_frequency > 0:
+                n_frequency_d_ = 0.0
 
         # Loading new training data
         if i % 1000 == 0 and i > 0:

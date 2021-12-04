@@ -50,6 +50,7 @@ def process_command_args(arguments):
     fac_fourier = 0
     fac_frequency = 0
     fac_lpips = 0
+    fac_huber = 0
 
     for args in arguments:
         # --- data path ---
@@ -149,6 +150,9 @@ def process_command_args(arguments):
         if args.startswith("fac_lpips"):
             fac_lpips = float(args.split("=")[1])
             default_facs = False
+        if args.startswith("fac_huber"):
+            fac_huber = float(args.split("=")[1])
+            default_facs = False
 
     if default_facs:
         fac_vgg = 0.5
@@ -191,11 +195,12 @@ def process_command_args(arguments):
         " texture:" + str(fac_texture) +
         " fourier:" + str(fac_fourier) + 
         " frequency:" + str(fac_frequency) +
-        " lpips:" + str(fac_lpips) )
+        " lpips:" + str(fac_lpips) +
+        " huber:" + str(fac_huber) )
     return dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir, restore_iter,\
         patch_w, patch_h, batch_size, train_size, learning_rate, eval_step, num_train_iters, \
         save_mid_imgs, leaky, norm_gen, \
-        fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips
+        fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips, fac_huber
 
 
 def process_test_model_args(arguments):
