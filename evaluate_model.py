@@ -66,6 +66,11 @@ with tf.compat.v1.Session(config=config) as sess:
     loss_list = [loss_psnr]
     loss_text = ["loss_psnr"]
 
+    # MSE loss
+    loss_mse = tf.reduce_mean(tf.math.squared_difference(enhanced, dslr_))
+    loss_list.append(loss_mse)
+    loss_text.append("loss_mse")
+
     ## L1 loss
     loss_l1 = tf.reduce_mean(tf.abs(tf.math.subtract(enhanced, dslr_)))
     loss_list.append(loss_l1)
