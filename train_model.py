@@ -97,7 +97,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
         loss_text.append("loss_color")
 
     # Huber loss
-    loss_huber = tf.reduce_mean(tf.compat.v1.losses.huber_loss(enhanced, dslr_, reduction=None))
+    loss_huber = tf.reduce_mean(tf.compat.v1.losses.huber_loss(enhanced, dslr_, reduction=tf.compat.v1.losses.Reduction.NONE))
     if fac_huber > 0:
         loss_generator += loss_huber * fac_huber
         loss_list.append(loss_huber)
