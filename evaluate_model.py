@@ -2,6 +2,7 @@ import re
 import tensorflow as tf
 import numpy as np
 from datetime import datetime
+from tensorflow.python.ops.gen_math_ops import square
 from tqdm import tqdm
 
 from load_dataset import load_test_data
@@ -107,9 +108,13 @@ with tf.compat.v1.Session(config=config) as sess:
     loss_text.append("loss_lpips")
     
     ## Huber loss
-    loss_huber = tf.reduce_mean(tf.compat.v1.losses.huber_loss(enhanced, dslr_, reduction=tf.compat.v1.losses.Reduction.NONE))
+    delta = 1
+    abs_error = tf.abs(tf.math.subtract(enhanced, dslr_))
+    quadratic = tf.math.minimum(abs_error, delta)
+    linear = tf.math.subtract(abs_error, quadratic)
+    loss_huber = tf.reduce_mean(0.5*tf.math.square(quadratic)+linear)
     loss_list.append(loss_huber)
-    loss_list.append("loss_huber")
+    loss_text.append("loss_huber")
 
     niqe = niqe.create_evaluator()
 

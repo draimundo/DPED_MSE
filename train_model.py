@@ -97,11 +97,15 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
         loss_text.append("loss_color")
 
     # Huber loss
-    loss_huber = tf.reduce_mean(tf.compat.v1.losses.huber_loss(enhanced, dslr_, reduction=tf.compat.v1.losses.Reduction.NONE))
+    delta = 1
+    abs_error = tf.abs(tf.math.subtract(enhanced, dslr_))
+    quadratic = tf.math.minimum(abs_error, delta)
+    linear = tf.math.subtract(abs_error, quadratic)
+    loss_huber = tf.reduce_mean(0.5*tf.math.square(quadratic)+linear)
     if fac_huber > 0:
         loss_generator += loss_huber * fac_huber
         loss_list.append(loss_huber)
-        loss_list.append("loss_huber")
+        loss_text.append("loss_huber")
 
     # Content loss
     CONTENT_LAYER = 'relu5_4'
