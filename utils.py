@@ -38,6 +38,7 @@ def process_command_args(arguments):
     save_mid_imgs = False
     leaky = True
     norm_gen = True
+    flat = False
 
     default_facs = True
     fac_mse = 0
@@ -119,6 +120,8 @@ def process_command_args(arguments):
             leaky = eval(args.split("=")[1])
         if args.startswith("norm_gen"):
             norm_gen = eval(args.split("=")[1])
+        if args.startswith("flat"):
+            flat = eval(args.split("=")[1])
 
         if args.startswith("fac_mse"):
             fac_mse = float(args.split("=")[1])
@@ -174,6 +177,7 @@ def process_command_args(arguments):
 
     print("The following parameters will be applied for training:")
     print("Restore Iteration: " + str(restore_iter))
+    print("Flat: " + str(flat))
     print("Batch size: " + str(batch_size))
     print("Training size: " + str(train_size))
     print("Learning rate: " + str(learning_rate))
@@ -199,7 +203,7 @@ def process_command_args(arguments):
         " huber:" + str(fac_huber) )
     return dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir, restore_iter,\
         patch_w, patch_h, batch_size, train_size, learning_rate, eval_step, num_train_iters, \
-        save_mid_imgs, leaky, norm_gen, \
+        save_mid_imgs, leaky, norm_gen, flat,\
         fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips, fac_huber
 
 
@@ -228,6 +232,7 @@ def process_test_model_args(arguments):
     use_gpu = False
     save_model = False
     test_image = True
+    flat = False
 
     for args in arguments:
         
@@ -284,6 +289,9 @@ def process_test_model_args(arguments):
         if args.startswith("test_image"):
             test_image = eval(args.split("=")[1])
 
+        if args.startswith("flat"):
+            flat = eval(args.split("=")[1])
+
     # choose architecture
     if arch == "resnet":
         name_model = "resnet"
@@ -299,6 +307,7 @@ def process_test_model_args(arguments):
     print("The following parameters will be applied for testing:")
 
     print("Model architecture: " + arch)
+    print("Flat: " + str(flat))
     print("Restore Iteration: " + str(restore_iter))
     print("Path to the dataset: " + dataset_dir)
     print("Path to Raw-to-RGB model network: " + model_dir)
@@ -306,7 +315,7 @@ def process_test_model_args(arguments):
     print("Path to testing data: " + test_dir)
 
     return dataset_dir, test_dir, model_dir, result_dir,\
-        arch, level, inst_norm, num_maps_base, orig_model, rand_param, restore_iter,\
+        arch, level, inst_norm, num_maps_base, flat, orig_model, rand_param, restore_iter,\
             img_h, img_w, use_gpu, save_model, test_image
 
 

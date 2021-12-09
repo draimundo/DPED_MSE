@@ -16,13 +16,21 @@ from tqdm import tqdm
 from datetime import datetime
 from load_dataset import extract_bayer_channels
 
-dataset_dir, test_dir, model_dir, result_dir, arch, LEVEL, inst_norm, num_maps_base,\
+dataset_dir, test_dir, model_dir, result_dir, arch, LEVEL, inst_norm, num_maps_base, flat,\
     orig_model, rand_param, restore_iter, IMAGE_HEIGHT, IMAGE_WIDTH, use_gpu, save_model, test_image = \
         utils.process_test_model_args(sys.argv)
 
 DSLR_SCALE = float(1) / (2 ** (max(LEVEL,0) - 1))
 MAX_SCALE = float(1) / (2 ** (5 - 1))
 IMAGE_HEIGHT, IMAGE_WIDTH = 1500, 2000
+TARGET_DEPTH = 3
+
+if flat:
+    FAC_PATCH = 1
+    PATCH_DEPTH = 1
+else:
+    FAC_PATCH = 2
+    PATCH_DEPTH = 4
 
 IMAGE_HCROP= int(np.floor(IMAGE_HEIGHT * MAX_SCALE)/MAX_SCALE)
 IMAGE_WCROP = int(np.floor(IMAGE_WIDTH * MAX_SCALE)/MAX_SCALE)
@@ -30,11 +38,11 @@ IMAGE_WCROP = int(np.floor(IMAGE_WIDTH * MAX_SCALE)/MAX_SCALE)
 TARGET_HEIGHT = int(np.floor(IMAGE_HCROP * DSLR_SCALE))
 TARGET_WIDTH = int(np.floor(IMAGE_WCROP * DSLR_SCALE))
 
-PATCH_HEIGHT = int(np.floor(IMAGE_HCROP*DSLR_SCALE)/DSLR_SCALE)
-PATCH_WIDTH = int(np.floor(IMAGE_WCROP*DSLR_SCALE)/DSLR_SCALE)
+PATCH_HEIGHT = int(np.floor(IMAGE_HCROP*DSLR_SCALE)/FAC_PATCH)
+PATCH_WIDTH = int(np.floor(IMAGE_WCROP*DSLR_SCALE)/FAC_PATCH)
 
-TARGET_DEPTH = 3
-PATCH_DEPTH = 4
+
+
 
 # Disable gpu if specified
 config = tf.compat.v1.ConfigProto(device_count={'GPU': 0}) if not use_gpu else None
@@ -58,7 +66,7 @@ with tf.compat.v1.Session(config=config) as sess:
 
 
     # generate enhanced image
-    enhanced = dped_g(x_)
+    enhanced = dped_g(x_, flat=flat)
 
 
     # Determine model weights
@@ -76,7 +84,8 @@ with tf.compat.v1.Session(config=config) as sess:
         print("Processing image " + photo)
 
         In = np.asarray(rawpy.imread((test_dir_full + photo)).raw_image.astype(np.float32))
-        In = extract_bayer_channels(In)
+        if not flat:
+            In = extract_bayer_channels(In)
 
         images[i,...] = In[0:PATCH_HEIGHT, 0:PATCH_WIDTH, ...]
     print("Images loaded")

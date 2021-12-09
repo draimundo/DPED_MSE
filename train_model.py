@@ -21,19 +21,26 @@ from skimage.filters import window
 # Processing command arguments
 dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir, restore_iter,\
 patch_w, patch_h, batch_size, train_size, learning_rate, eval_step, num_train_iters, \
-save_mid_imgs, leaky, norm_gen, \
+save_mid_imgs, leaky, norm_gen, flat,\
 fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips, fac_huber \
     = utils.process_command_args(sys.argv)
 
 # Defining the size of the input and target image patches
-PATCH_WIDTH = patch_w//2
-PATCH_HEIGHT = patch_h//2
+if flat:
+    FAC_PATCH = 1
+    PATCH_DEPTH = 1
+else:
+    FAC_PATCH = 2
+    PATCH_DEPTH = 4
+
+PATCH_WIDTH = patch_w//FAC_PATCH
+PATCH_HEIGHT = patch_h//FAC_PATCH
 PATCH_SIZE = PATCH_WIDTH * PATCH_HEIGHT * 3
 
 LEVEL = 0
 DSLR_SCALE = float(1) / (2 ** (max(LEVEL,0) - 1))
-TARGET_WIDTH = int(PATCH_WIDTH * DSLR_SCALE)
-TARGET_HEIGHT = int(PATCH_HEIGHT * DSLR_SCALE)
+TARGET_WIDTH = int(PATCH_WIDTH * FAC_PATCH)
+TARGET_HEIGHT = int(PATCH_HEIGHT * FAC_PATCH)
 TARGET_DEPTH = 3
 TARGET_SIZE = TARGET_WIDTH * TARGET_HEIGHT * TARGET_DEPTH
 
@@ -45,11 +52,11 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     time_start = datetime.now()
 
     # Placeholders for training data
-    phone_ = tf.compat.v1.placeholder(tf.float32, [batch_size, PATCH_HEIGHT, PATCH_WIDTH, 4])
+    phone_ = tf.compat.v1.placeholder(tf.float32, [batch_size, PATCH_HEIGHT, PATCH_WIDTH, PATCH_DEPTH])
     dslr_ = tf.compat.v1.placeholder(tf.float32, [batch_size, TARGET_HEIGHT, TARGET_WIDTH, TARGET_DEPTH])
 
     # Get the processed enhanced image
-    enhanced = dped_g(phone_, leaky = leaky, instance_norm = norm_gen)
+    enhanced = dped_g(phone_, leaky = leaky, instance_norm = norm_gen, flat = flat)
 
     # Losses
     dslr_gray = tf.image.rgb_to_grayscale(dslr_)
@@ -208,11 +215,11 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
 
     # Loading training and validation data
     print("Loading validation data...")
-    val_data, val_answ = load_val_data(dataset_dir, dslr_dir, phone_dir, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE)
+    val_data, val_answ = load_val_data(dataset_dir, dslr_dir, phone_dir, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, flat)
     print("Validation data was loaded\n")
 
     print("Loading training data...")
-    train_data, train_answ = load_train_patch(dataset_dir, dslr_dir, phone_dir, train_size, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE)
+    train_data, train_answ = load_train_patch(dataset_dir, dslr_dir, phone_dir, train_size, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, flat)
     print("Training data was loaded\n")
 
     VAL_SIZE = val_data.shape[0]
@@ -359,6 +366,6 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
         if i % 1000 == 0 and i > 0:
             del train_data
             del train_answ
-            train_data, train_answ = load_train_patch(dataset_dir, dslr_dir, phone_dir, train_size, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE)
+            train_data, train_answ = load_train_patch(dataset_dir, dslr_dir, phone_dir, train_size, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, flat)
 
     print('total train/eval time:', datetime.now() - time_start)
