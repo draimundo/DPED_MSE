@@ -236,7 +236,7 @@ def load_train_patch(dataset_dir, dslr_dir, phone_dir, TRAIN_SIZE, PATCH_WIDTH, 
     NUM_TRAINING_IMAGES = len([name for name in os.listdir(train_directory_phone)
                                if os.path.isfile(os.path.join(train_directory_phone, name))])
 
-    TRAIN_IMAGES = np.random.choice(np.arange(0, int(percentage*NUM_TRAINING_IMAGES)), TRAIN_SIZE, replace=False)
+    TRAIN_IMAGES = np.random.choice(np.arange(0, int(percentage*NUM_TRAINING_IMAGES/100)), TRAIN_SIZE, replace=False)
 
     train_data = np.zeros((TRAIN_SIZE, PATCH_WIDTH, PATCH_HEIGHT, PATCH_DEPTH))
     train_answ = np.zeros((TRAIN_SIZE, int(PATCH_WIDTH * DSLR_SCALE / FAC_SCALE), int(PATCH_HEIGHT * DSLR_SCALE / FAC_SCALE), 3))
