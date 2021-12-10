@@ -22,9 +22,9 @@ dataset_dir, test_dir, model_dir, result_dir, arch, LEVEL, inst_norm, num_maps_b
 
 DSLR_SCALE = float(1) / (2 ** (max(LEVEL,0) - 1))
 MAX_SCALE = float(1) / (2 ** (5 - 1))
-IMAGE_HEIGHT, IMAGE_WIDTH = 1500, 2000
+IMAGE_HEIGHT, IMAGE_WIDTH = 3000, 4000
 TARGET_DEPTH = 3
-
+print(flat)
 if flat:
     FAC_PATCH = 1
     PATCH_DEPTH = 1
@@ -32,14 +32,12 @@ else:
     FAC_PATCH = 2
     PATCH_DEPTH = 4
 
-IMAGE_HCROP= int(np.floor(IMAGE_HEIGHT * MAX_SCALE)/MAX_SCALE)
-IMAGE_WCROP = int(np.floor(IMAGE_WIDTH * MAX_SCALE)/MAX_SCALE)
 
-TARGET_HEIGHT = int(np.floor(IMAGE_HCROP * DSLR_SCALE))
-TARGET_WIDTH = int(np.floor(IMAGE_WCROP * DSLR_SCALE))
+TARGET_HEIGHT = IMAGE_HEIGHT
+TARGET_WIDTH = IMAGE_WIDTH
 
-PATCH_HEIGHT = int(np.floor(IMAGE_HCROP*DSLR_SCALE)/FAC_PATCH)
-PATCH_WIDTH = int(np.floor(IMAGE_WCROP*DSLR_SCALE)/FAC_PATCH)
+PATCH_HEIGHT = int(np.floor(IMAGE_HEIGHT//FAC_PATCH))
+PATCH_WIDTH = int(np.floor(IMAGE_WIDTH//FAC_PATCH))
 
 
 
@@ -85,9 +83,11 @@ with tf.compat.v1.Session(config=config) as sess:
 
         In = np.asarray(rawpy.imread((test_dir_full + photo)).raw_image.astype(np.float32))
         if not flat:
-            In = extract_bayer_channels(In)
-
-        images[i,...] = In[0:PATCH_HEIGHT, 0:PATCH_WIDTH, ...]
+            I = extract_bayer_channels(I)
+            images[i,...] = In[0:PATCH_HEIGHT, 0:PATCH_WIDTH, ...]
+        else:
+            images[i,..., 0] = In[0:PATCH_HEIGHT, 0:PATCH_WIDTH, ...]
+        
     print("Images loaded")
     # Run inference
 
