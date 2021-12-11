@@ -3,6 +3,7 @@
 ###########################################
 
 from __future__ import print_function
+import pickle
 from PIL import Image
 import imageio
 import os
@@ -215,7 +216,7 @@ def load_test_data_exp(dataset_dir, dslr_dir, phone_dir, over_dir, under_dir, PA
     return test_data, test_answ
 
 
-def load_train_patch(dataset_dir, dslr_dir, phone_dir, TRAIN_SIZE, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, flat=False, percentage=100):
+def load_train_patch(dataset_dir, dslr_dir, phone_dir, TRAIN_SIZE, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, flat=False, percentage=100, entropy='no'):
     if percentage > 100:
         percentage = 100
 
@@ -228,15 +229,22 @@ def load_train_patch(dataset_dir, dslr_dir, phone_dir, TRAIN_SIZE, PATCH_WIDTH, 
         PATCH_DEPTH = 1
         FAC_SCALE = 2
         
-
     # get the image format (e.g. 'png')
     format_dslr = str.split(os.listdir(train_directory_dslr)[0],'.')[-1]
 
     # determine training image numbers by listing all files in the folder
     NUM_TRAINING_IMAGES = len([name for name in os.listdir(train_directory_phone)
                                if os.path.isfile(os.path.join(train_directory_phone, name))])
+    if entropy == 'high':
+        entropyList = pickle.load(file=open("entropyList.p", "rb"))
+        TRAIN_IMAGES = np.random.choice(entropyList[int((100-percentage)*NUM_TRAINING_IMAGES/100):-1], TRAIN_SIZE, replace=False)
 
-    TRAIN_IMAGES = np.random.choice(np.arange(0, int(percentage*NUM_TRAINING_IMAGES/100)), TRAIN_SIZE, replace=False)
+    elif entropy == 'low':
+        entropyList = pickle.load(file=open("entropyList.p", "rb"))
+        TRAIN_IMAGES = np.random.choice(entropyList[0:int(percentage*NUM_TRAINING_IMAGES/100)], TRAIN_SIZE, replace=False)
+
+    else:
+        TRAIN_IMAGES = np.random.choice(np.arange(0, int(percentage*NUM_TRAINING_IMAGES/100)), TRAIN_SIZE, replace=False)
 
     train_data = np.zeros((TRAIN_SIZE, PATCH_WIDTH, PATCH_HEIGHT, PATCH_DEPTH))
     train_answ = np.zeros((TRAIN_SIZE, int(PATCH_WIDTH * DSLR_SCALE / FAC_SCALE), int(PATCH_HEIGHT * DSLR_SCALE / FAC_SCALE), 3))
