@@ -83,7 +83,7 @@ with tf.compat.v1.Session(config=config) as sess:
 
         In = np.asarray(rawpy.imread((test_dir_full + photo)).raw_image.astype(np.float32))
         if not flat:
-            I = extract_bayer_channels(I)
+            In = extract_bayer_channels(In)
             images[i,...] = In[0:PATCH_HEIGHT, 0:PATCH_WIDTH, ...]
         else:
             images[i,..., 0] = In[0:PATCH_HEIGHT, 0:PATCH_WIDTH, ...]
