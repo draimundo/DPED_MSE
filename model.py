@@ -6,10 +6,10 @@ import tensorflow as tf
 import numpy as np
 
 
-def dped_g(input_image, leaky = True, instance_norm = True, flat = False):
+def dped_g(input_image, leaky = True, instance_norm = True, flat = 0):
     with tf.compat.v1.variable_scope("generator"):
-        if flat:
-            conv1 = _conv_layer(input_image, 64, 9, 2, instance_norm = False, leaky = leaky)
+        if flat > 0:
+            conv1 = _conv_layer(input_image, 64, flat, 2, instance_norm = False, leaky = leaky)
         else:
             conv1 = _conv_layer(input_image, 64, 9, 1, instance_norm = False, leaky = leaky)
         

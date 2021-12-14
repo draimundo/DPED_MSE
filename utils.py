@@ -33,12 +33,12 @@ def process_command_args(arguments):
     train_size = 5000
     learning_rate = 5e-5
     eval_step = 1000
-    num_train_iters = 300000
+    num_train_iters = 100000
     # --- more options ---
     save_mid_imgs = False
     leaky = True
     norm_gen = True
-    flat = False
+    flat = 0
     percentage = 100
     entropy='no'
 
@@ -123,7 +123,7 @@ def process_command_args(arguments):
         if args.startswith("norm_gen"):
             norm_gen = eval(args.split("=")[1])
         if args.startswith("flat"):
-            flat = eval(args.split("=")[1])
+            flat = int(args.split("=")[1])
         if args.startswith("percentage"):
             percentage = int(args.split("=")[1])
         if args.startswith("entropy"):
@@ -240,7 +240,7 @@ def process_test_model_args(arguments):
     use_gpu = False
     save_model = False
     test_image = True
-    flat = False
+    flat = 0
 
     for args in arguments:
         
@@ -298,7 +298,7 @@ def process_test_model_args(arguments):
             test_image = eval(args.split("=")[1])
 
         if args.startswith("flat"):
-            flat = eval(args.split("=")[1])
+            flat = int(args.split("=")[1])
 
     # choose architecture
     if arch == "resnet":

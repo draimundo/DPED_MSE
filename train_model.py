@@ -243,8 +243,6 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     if fac_frequency > 0:
         loss_frequency_g_ = 0.0
         n_frequency_d_ = 0.0
-
-    maxGen = 0.0
     
     for i in tqdm(range(iter_start, num_train_iters + 1), miniters=100):
         # Train texture discriminator
@@ -327,10 +325,6 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
                 logs_gen += " | texture_d loss: %.4g; n_texture_d: %.4g" % (val_loss_texture_d, n_texture_d_)
             if fac_frequency > 0:
                 logs_gen += " | frequency_d loss: %.4g; n_frequency_d: %.4g" % (val_loss_frequency_d, n_frequency_d_)
-
-            if maxGen < val_losses_g[0][loss_text.index("loss_generator")]:
-                maxGen = val_losses_g[0][loss_text.index("loss_generator")]
-                logs_gen += "\n min Gen loss!"
 
             print(logs_gen)
 
