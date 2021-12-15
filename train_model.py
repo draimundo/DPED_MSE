@@ -21,7 +21,7 @@ from skimage.filters import window
 # Processing command arguments
 dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir, restore_iter,\
 patch_w, patch_h, batch_size, train_size, learning_rate, eval_step, num_train_iters, \
-save_mid_imgs, leaky, norm_gen, flat, percentage, entropy,\
+save_mid_imgs, leaky, norm_gen, flat, percentage, entropy, mix,\
 fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips, fac_huber \
     = utils.process_command_args(sys.argv)
 
@@ -219,7 +219,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     print("Validation data was loaded\n")
 
     print("Loading training data...")
-    train_data, train_answ = load_train_patch(dataset_dir, dslr_dir, phone_dir, train_size, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, flat, percentage, entropy)
+    train_data, train_answ = load_train_patch(dataset_dir, dslr_dir, phone_dir, train_size, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, flat, percentage, entropy, mix)
     print("Training data was loaded\n")
 
     VAL_SIZE = val_data.shape[0]
@@ -360,6 +360,6 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
         if i % 1000 == 0 and i > 0:
             del train_data
             del train_answ
-            train_data, train_answ = load_train_patch(dataset_dir, dslr_dir, phone_dir, train_size, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, flat, percentage, entropy)
+            train_data, train_answ = load_train_patch(dataset_dir, dslr_dir, phone_dir, train_size, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, flat, percentage, entropy, mix)
 
     print('total train/eval time:', datetime.now() - time_start)

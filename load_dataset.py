@@ -216,7 +216,7 @@ def load_test_data_exp(dataset_dir, dslr_dir, phone_dir, over_dir, under_dir, PA
     return test_data, test_answ
 
 
-def load_train_patch(dataset_dir, dslr_dir, phone_dir, TRAIN_SIZE, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, flat=False, percentage=100, entropy='no'):
+def load_train_patch(dataset_dir, dslr_dir, phone_dir, TRAIN_SIZE, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, flat=False, percentage=100, entropy='no', mix=0):
     if percentage > 100:
         percentage = 100
 
@@ -253,14 +253,29 @@ def load_train_patch(dataset_dir, dslr_dir, phone_dir, TRAIN_SIZE, PATCH_WIDTH, 
     for img in tqdm(TRAIN_IMAGES, miniters=100):
 
         I = np.float32(np.asarray(imageio.imread((train_directory_phone + str(img) + '.png'))))
+        
+        if mix > 1:
+            iRand = np.random.choice(TRAIN_IMAGES, mix-1, replace=False)
+            for iMix in iRand:
+                I += np.float32(np.asarray(imageio.imread((train_directory_phone + str(iMix) + '.png'))))
+            I /= mix
+        
         if not flat:
             I = extract_bayer_channels(I)
             train_data[i, :] = I
         else:
             train_data[i, ..., 0] = I
         
+        
         I = Image.open(train_directory_dslr + str(img) + '.' + format_dslr)
         I = np.float32(np.reshape(I, [1, int(PATCH_WIDTH * DSLR_SCALE / FAC_SCALE), int(PATCH_HEIGHT * DSLR_SCALE / FAC_SCALE), 3])) / 255
+
+        if mix > 1:
+            for iMix in iRand:
+                Itmp = Image.open(train_directory_dslr + str(iMix) + '.' + format_dslr)
+                I += np.float32(np.reshape(Itmp, [1, int(PATCH_WIDTH * DSLR_SCALE / FAC_SCALE), int(PATCH_HEIGHT * DSLR_SCALE / FAC_SCALE), 3])) / 255
+            I /= mix
+
         train_answ[i, :] = I
 
         i += 1
