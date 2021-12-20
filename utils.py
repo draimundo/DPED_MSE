@@ -42,6 +42,7 @@ def process_command_args(arguments):
     percentage = 100
     entropy='no'
     mix = 0
+    optimizer='adam'
 
     default_facs = True
     fac_mse = 0
@@ -131,6 +132,8 @@ def process_command_args(arguments):
             entropy = args.split("=")[1]
         if args.startswith("mix"):
             mix = int(args.split("=")[1])
+        if args.startswith("optimizer"):
+            optimizer = args.split("=")[1]
 
         if args.startswith("fac_mse"):
             fac_mse = float(args.split("=")[1])
@@ -190,6 +193,7 @@ def process_command_args(arguments):
     print("Training data pecentage: " + str(percentage))
     print("Sort training images by entropy: " + entropy)
     print("Mixing number of images: " + str(mix))
+    print("Optimizer: " + optimizer)
     print("Batch size: " + str(batch_size))
     print("Training size: " + str(train_size))
     print("Learning rate: " + str(learning_rate))
@@ -215,7 +219,7 @@ def process_command_args(arguments):
         " huber:" + str(fac_huber) )
     return dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir, restore_iter,\
         patch_w, patch_h, batch_size, train_size, learning_rate, eval_step, num_train_iters, \
-        save_mid_imgs, leaky, norm_gen, flat, percentage, entropy, mix,\
+        save_mid_imgs, leaky, norm_gen, flat, percentage, entropy, mix, optimizer,\
         fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips, fac_huber
 
 

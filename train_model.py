@@ -17,11 +17,15 @@ import lpips_tf
 from tqdm import tqdm
 from skimage.filters import window
 
+from AdaBound import AdaBoundOptimizer
+from AMSGrad import AMSGrad
+from RAdam import RAdamOptimizer
+
 
 # Processing command arguments
 dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir, restore_iter,\
 patch_w, patch_h, batch_size, train_size, learning_rate, eval_step, num_train_iters, \
-save_mid_imgs, leaky, norm_gen, flat, percentage, entropy, mix,\
+save_mid_imgs, leaky, norm_gen, flat, percentage, entropy, mix, optimizer,\
 fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips, fac_huber \
     = utils.process_command_args(sys.argv)
 
@@ -190,9 +194,26 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     loss_list.insert(0, loss_generator)
     loss_text.insert(0, "loss_generator")
 
+
     # Optimize network parameters
     vars_dped_g = [v for v in tf.compat.v1.global_variables() if v.name.startswith("generator")]
-    train_step_dped_g = tf.compat.v1.train.AdamOptimizer(learning_rate).minimize(loss_generator, var_list=vars_dped_g)
+    # if optimizer == "adamp":
+    #     train_step_dped_g = AdamP(learning_rate=learning_rate).minimize(loss_no_args, var_list=vars_dped_g)
+    # elif optimizer == "sgdp":
+    #     train_step_dped_g = SGDP(learning_rate=learning_rate).minimize(loss_no_args, var_list=vars_dped_g)
+    if optimizer == "adabound":
+        train_step_dped_g = AdaBoundOptimizer(learning_rate=learning_rate).minimize(loss_generator, var_list=vars_dped_g)
+    elif optimizer == "amsbound":
+        train_step_dped_g = AdaBoundOptimizer(learning_rate=learning_rate, amsbound=True).minimize(loss_generator, var_list=vars_dped_g)
+    elif optimizer == "amsgrad":
+        train_step_dped_g = AMSGrad(learning_rate=learning_rate).minimize(loss_generator, var_list=vars_dped_g)
+    elif optimizer == "radam":
+        train_step_dped_g = RAdamOptimizer(learning_rate=learning_rate).minimize(loss_generator, var_list=vars_dped_g)
+    elif optimizer == "adam":
+        train_step_dped_g = tf.compat.v1.train.AdamOptimizer(learning_rate).minimize(loss_generator, var_list=vars_dped_g)
+    else:
+        print("Optimizer not found -> using Adam")
+        train_step_dped_g = tf.compat.v1.train.AdamOptimizer(learning_rate).minimize(loss_generator, var_list=vars_dped_g)
 
     if fac_texture > 0:
         vars_texture_d = [v for v in tf.compat.v1.global_variables() if v.name.startswith("texture_d")]
