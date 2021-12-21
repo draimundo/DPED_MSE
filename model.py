@@ -73,19 +73,19 @@ def unet_d(input, activation=True):
         ch = 64
         sn = True
 
-        x = _resblock_down(input, ch, use_bias = False, relu=False, sn=sn) #128
+        x = _resblock_down(input, ch, use_bias = False, sn=sn) #128
         ch = ch*2
 
-        x = _resblock_down(x, ch, use_bias = False, relu=False, sn=sn) #64
+        x = _resblock_down(x, ch, use_bias = False, sn=sn) #64
 
         x = _self_attention(x, ch, sn)
         ch = ch*2
 
-        x = _resblock_down(x, ch, use_bias = False, relu=False, sn=sn) #32
+        x = _resblock_down(x, ch, use_bias = False, sn=sn) #32
         ch = ch*2
 
-        x = _resblock_down(x, ch, use_bias = False, relu=False, sn=sn) #16
-        x = _resblock_down(x, ch, use_bias = False, relu=False, sn=sn) #8
+        x = _resblock_down(x, ch, use_bias = False, sn=sn) #16
+        x = _resblock_down(x, ch, use_bias = False, sn=sn) #8
 
         x = leaky_relu(x)
         x = _global_sum_pool(x)
