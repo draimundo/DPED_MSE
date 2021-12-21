@@ -98,11 +98,11 @@ def unet_d(input, activation=True):
 
 
 def _resblock_down(input, num_filters, use_bias=True, sn=False):
-    x = _batch_norm(input)
+    x = _instance_norm(input)
     x = leaky_relu(x)
     x = _conv_layer(x, num_filters, 3, 2, relu=False, use_bias=use_bias, sn=sn)
 
-    x = _batch_norm(x)
+    x = _instance_norm(x)
     x = leaky_relu(x)
     x = _conv_layer(x, num_filters, 3, 1, relu=False, use_bias=use_bias, sn=sn)
 
