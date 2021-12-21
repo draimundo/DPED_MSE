@@ -130,7 +130,7 @@ def _hw_flatten(x) :
     return tf.reshape(x, shape=[x.shape[0], -1, x.shape[-1]])
 
 def _batch_norm(x):
-    return tf.layers.batch_normalization(x,
+    return tf.compat.v1.layers.batch_normalization(x,
                                          momentum=0.9,
                                          epsilon=1e-05)
 
