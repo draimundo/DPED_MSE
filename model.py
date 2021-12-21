@@ -95,7 +95,7 @@ def unet_d(input, activation=True):
 
         if activation:
             out = tf.nn.softmax(out)
-
+        return out
 
 def _resblock_down(input, num_filters, use_bias=True, sn=False):
     x = _instance_norm(input)
