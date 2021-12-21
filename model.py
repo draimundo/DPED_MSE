@@ -68,6 +68,72 @@ def fourier_d(input, activation=True):
 
     return out
 
+def unet_d(input, activation=True):
+    with tf.compat.v1.variable_scope("unet_d"):
+        ch = 64
+        sn = True
+
+        x = _resblock_down(input, ch, use_bias = False, relu=False, sn=sn) #128
+        ch = ch*2
+
+        x = _resblock_down(x, ch, use_bias = False, relu=False, sn=sn) #64
+
+        x = _self_attention(x, ch, sn)
+        ch = ch*2
+
+        x = _resblock_down(x, ch, use_bias = False, relu=False, sn=sn) #32
+        ch = ch*2
+
+        x = _resblock_down(x, ch, use_bias = False, relu=False, sn=sn) #16
+        x = _resblock_down(x, ch, use_bias = False, relu=False, sn=sn) #8
+
+        x = leaky_relu(x)
+        x = _global_sum_pool(x)
+
+        flat = tf.compat.v1.layers.flatten(x)
+        out = _fully_connected_layer(flat, 2, relu=False)
+
+        if activation:
+            out = tf.nn.softmax(out)
+
+
+def _resblock_down(input, num_filters, use_bias=True, sn=False):
+    x = _batch_norm(input)
+    x = leaky_relu(x)
+    x = _conv_layer(x, num_filters, 3, 2, relu=False, use_bias=use_bias, sn=sn)
+
+    x = _batch_norm(x)
+    x = leaky_relu(x)
+    x = _conv_layer(x, num_filters, 3, 1, relu=False, use_bias=use_bias, sn=sn)
+
+    input = _conv_layer(input, num_filters, 3, 2, relu=False, use_bias=use_bias, sn=sn)
+
+    return x + input
+
+def _self_attention(x, num_filters, sn=False):
+    f = _conv_layer(x, num_filters=num_filters//8, filter_size=1, strides=1, relu=False, use_bias=False, sn=sn)
+    g = _conv_layer(x, num_filters=num_filters//8, filter_size=1, strides=1, relu=False, use_bias=False, sn=sn)
+    h = _conv_layer(x, num_filters=num_filters, filter_size=1, strides=1, relu=False, use_bias=False, sn=sn)
+
+    s = tf.matmul(_hw_flatten(g), _hw_flatten(f), transpose_b=True)
+    beta = tf.nn.softmax(s)
+
+    o = tf.matmul(beta, _hw_flatten(h))
+    gamma = tf.get_variable("gamma", [1], initializer=tf.constant_initializer(0.0))
+
+    o = tf.reshape(o, shape=x.shape)  # [bs, h, w, C]
+    x = gamma * o + x
+
+    return x
+
+def _hw_flatten(x) :
+    return tf.reshape(x, shape=[x.shape[0], -1, x.shape[-1]])
+
+def _batch_norm(x):
+    return tf.layers.batch_normalization(x,
+                                         momentum=0.9,
+                                         epsilon=1e-05)
+
 def weight_variable(shape, name):
 
     initial = tf.compat.v1.truncated_normal(shape, stddev=0.01)
@@ -121,13 +187,19 @@ def conv2d(x, W):
     return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
 
 
-def _conv_layer(net, num_filters, filter_size, strides, relu=True, instance_norm=False, padding='SAME', leaky = True):
+def _conv_layer(net, num_filters, filter_size, strides, relu=True, instance_norm=False, padding='SAME', leaky = True, use_bias=True, sn=False):
 
     weights_init = _conv_init_vars(net, num_filters, filter_size)
     strides_shape = [1, strides, strides, 1]
-    bias = tf.Variable(tf.constant(0.01, shape=[num_filters]))
 
-    net = tf.nn.conv2d(net, weights_init, strides_shape, padding=padding) + bias
+    if sn:
+        weights_init = _spectral_norm(weights_init)
+
+    net = tf.nn.conv2d(net, weights_init, strides_shape, padding=padding)
+
+    if use_bias:
+        bias = tf.Variable(tf.constant(0.01, shape=[num_filters]))
+        net = tf.nn.bias_add(net, bias)
 
     if instance_norm:
         net = _instance_norm(net)
@@ -202,5 +274,38 @@ def _conv_tranpose_layer(net, num_filters, filter_size, strides, leaky = True):
         return tf.compat.v1.nn.relu(net)
 
 
-def max_pool(x, n):
+def _max_pool(x, n):
     return tf.nn.max_pool(x, ksize=[1, n, n, 1], strides=[1, n, n, 1], padding='VALID')
+
+def _global_sum_pool(x):
+    return tf.reduce_sum(x, axis=[1, 2])
+
+def _spectral_norm(w, iteration=1):
+    w_shape = w.shape.as_list()
+    w = tf.reshape(w, [-1, w_shape[-1]])
+
+    u = tf.get_variable("u", [1, w_shape[-1]], initializer=tf.random_normal_initializer(), trainable=False)
+
+    u_hat = u
+    v_hat = None
+    for i in range(iteration):
+        """
+        power iteration
+        Usually iteration = 1 will be enough
+        """
+        v_ = tf.matmul(u_hat, tf.transpose(w))
+        v_hat = tf.nn.l2_normalize(v_)
+
+        u_ = tf.matmul(v_hat, w)
+        u_hat = tf.nn.l2_normalize(u_)
+
+    u_hat = tf.stop_gradient(u_hat)
+    v_hat = tf.stop_gradient(v_hat)
+
+    sigma = tf.matmul(tf.matmul(v_hat, w), tf.transpose(u_hat))
+
+    with tf.control_dependencies([u.assign(u_hat)]):
+        w_norm = w / sigma
+        w_norm = tf.reshape(w_norm, w_shape)
+
+    return w_norm

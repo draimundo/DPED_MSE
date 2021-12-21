@@ -9,7 +9,7 @@ import sys
 from datetime import datetime
 
 from load_dataset import load_train_patch, load_val_data
-from model import dped_g, fourier_d, texture_d
+from model import dped_g, fourier_d, texture_d, unet_d
 import utils
 import vgg
 import lpips_tf
@@ -26,7 +26,7 @@ from RAdam import RAdamOptimizer
 dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir, restore_iter,\
 patch_w, patch_h, batch_size, train_size, learning_rate, eval_step, num_train_iters, \
 save_mid_imgs, leaky, norm_gen, flat, percentage, entropy, mix, optimizer,\
-fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips, fac_huber \
+fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips, fac_huber, fac_unet \
     = utils.process_command_args(sys.argv)
 
 # Defining the size of the input and target image patches
@@ -182,6 +182,21 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
         loss_list.append(loss_frequency_g)
         loss_text.append("loss_frequency")
 
+    if fac_unet > 0:
+        adv_real = dslr_
+        adv_fake = enhanced
+
+        pred_real = unet_d(adv_real, activation=False)
+        pred_fake = unet_d(adv_fake, activation=False)
+
+        loss_unet_g = -tf.reduce_mean(tf.math.log(tf.clip_by_value(tf.nn.sigmoid(pred_fake - pred_real), 1e-10, 1.0)))
+        loss_unet_d = -tf.reduce_mean(tf.math.log(tf.clip_by_value(tf.nn.sigmoid(pred_real - pred_fake), 1e-10, 1.0)))
+
+        loss_generator += loss_unet_g * fac_unet
+        loss_list.append(loss_unet_g)
+        loss_text.append("loss_unet")
+
+
     ## LPIPS
     loss_lpips = tf.reduce_mean(lpips_tf.lpips(enhanced, dslr_, net='alex'))
     loss_list.append(loss_lpips)
@@ -216,12 +231,25 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
         train_step_dped_g = tf.compat.v1.train.AdamOptimizer(learning_rate).minimize(loss_generator, var_list=vars_dped_g)
 
     if fac_texture > 0:
+        loss_texture_g_ = 0.0
+        n_texture_d_ = 0.0
+        lr_texture_d = learning_rate
         vars_texture_d = [v for v in tf.compat.v1.global_variables() if v.name.startswith("texture_d")]
-        train_step_texture_d = tf.compat.v1.train.AdamOptimizer(learning_rate/1000.0).minimize(loss_texture_d, var_list=vars_texture_d)
+        train_step_texture_d = RAdamOptimizer(lr_texture_d/10000.0).minimize(loss_texture_d, var_list=vars_texture_d)
 
     if fac_frequency > 0:
+        loss_frequency_g_ = 0.0
+        n_frequency_d_ = 0.0
+        lr_frequency_d = learning_rate
         vars_frequency_d = [v for v in tf.compat.v1.global_variables() if v.name.startswith("fourier_d")]
-        train_step_frequency_d = tf.compat.v1.train.AdamOptimizer(learning_rate/1000.0).minimize(loss_frequency_d, var_list=vars_frequency_d)
+        train_step_frequency_d = RAdamOptimizer(lr_frequency_d/10000.0).minimize(loss_frequency_d, var_list=vars_frequency_d)
+
+    if fac_unet > 0:
+        loss_unet_g_ = 0.0
+        n_unet_d_ = 0.0
+        lr_unet_d = learning_rate
+        vars_unet_d = [v for v in tf.compat.v1.global_variables() if v.name.startswith("unet_d")]
+        train_step_unet_d = RAdamOptimizer(lr_unet_d/10000.0).minimize(loss_unet_d, var_list=vars_unet_d)
 
     # Initialize and restore the variables
     print("Initializing variables...")
@@ -258,12 +286,6 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     logs.close()
 
     loss_dped_g_ = 0.0
-    if fac_texture > 0:
-        loss_texture_g_ = 0.0
-        n_texture_d_ = 0.0
-    if fac_frequency > 0:
-        loss_frequency_g_ = 0.0
-        n_frequency_d_ = 0.0
     
     for i in tqdm(range(iter_start, num_train_iters + 1), miniters=100):
         # Train texture discriminator
@@ -292,6 +314,19 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
                 [loss_temp, temp] = sess.run([loss_frequency_d, train_step_frequency_d], feed_dict=feed_frequency_d)
                 n_frequency_d_ += 1
 
+        # Train unet discriminator
+        if fac_unet > 0:
+            idx_unet_d = np.random.randint(0, train_size, batch_size)
+            phone_unet_d = train_data[idx_unet_d]
+            dslr_unet_d = train_answ[idx_unet_d]
+
+            feed_unet_d = {phone_: phone_unet_d, dslr_: dslr_unet_d}
+            [loss_g, loss_d] = sess.run([loss_unet_g, loss_unet_d], feed_dict=feed_unet_d)
+
+            if loss_g < 3*loss_d:
+                [loss_temp, temp] = sess.run([loss_unet_d, train_step_unet_d], feed_dict=feed_unet_d)
+                n_unet_d_ += 1
+
 
         # Train generator
         idx_g = np.random.randint(0, train_size, batch_size)
@@ -318,6 +353,8 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
                 val_loss_texture_d = 0.0
             if fac_frequency > 0:
                 val_loss_frequency_d = 0.0
+            if fac_unet > 0:
+                val_loss_unet_d = 0.0
 
             for j in range(num_val_batches):
                 be = j * batch_size
@@ -338,6 +375,9 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
                 if fac_frequency > 0:
                     loss_temp = sess.run(loss_frequency_d, feed_dict=valdict)
                     val_loss_frequency_d += loss_temp / num_val_batches
+                if fac_unet > 0:
+                    loss_temp = sess.run(loss_unet_d, feed_dict=valdict)
+                    val_loss_unet_d += loss_temp / num_val_batches
 
             logs_gen = "step %d | training: %.4g,  "  % (i, loss_dped_g_)
             for idx, loss in enumerate(loss_text):
@@ -346,6 +386,8 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
                 logs_gen += " | texture_d loss: %.4g; n_texture_d: %.4g" % (val_loss_texture_d, n_texture_d_)
             if fac_frequency > 0:
                 logs_gen += " | frequency_d loss: %.4g; n_frequency_d: %.4g" % (val_loss_frequency_d, n_frequency_d_)
+            if fac_unet > 0:
+                logs_gen += " | unet_d loss: %.4g; n_frequency_d: %.4g" % (val_loss_unet_d, n_unet_d_)
 
             print(logs_gen)
 

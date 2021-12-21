@@ -42,7 +42,7 @@ def process_command_args(arguments):
     percentage = 100
     entropy='no'
     mix = 0
-    optimizer='adam'
+    optimizer='radam'
 
     default_facs = True
     fac_mse = 0
@@ -56,6 +56,7 @@ def process_command_args(arguments):
     fac_frequency = 0
     fac_lpips = 0
     fac_huber = 0
+    fac_unet = 0
 
     for args in arguments:
         # --- data path ---
@@ -168,6 +169,9 @@ def process_command_args(arguments):
         if args.startswith("fac_huber"):
             fac_huber = float(args.split("=")[1])
             default_facs = False
+        if args.startswith("fac_unet"):
+            fac_unet = float(args.split("=")[1])
+            default_facs = False
 
     if default_facs:
         fac_vgg = 0.5
@@ -216,11 +220,12 @@ def process_command_args(arguments):
         " fourier:" + str(fac_fourier) + 
         " frequency:" + str(fac_frequency) +
         " lpips:" + str(fac_lpips) +
-        " huber:" + str(fac_huber) )
+        " huber:" + str(fac_huber) +
+        " unet:" + str(fac_unet) )
     return dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir, restore_iter,\
         patch_w, patch_h, batch_size, train_size, learning_rate, eval_step, num_train_iters, \
         save_mid_imgs, leaky, norm_gen, flat, percentage, entropy, mix, optimizer,\
-        fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips, fac_huber
+        fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips, fac_huber, fac_unet
 
 
 def process_test_model_args(arguments):
