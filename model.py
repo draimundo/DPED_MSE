@@ -119,7 +119,7 @@ def _self_attention(x, num_filters, sn=False):
     beta = tf.nn.softmax(s)
 
     o = tf.matmul(beta, _hw_flatten(h))
-    gamma = tf.get_variable("gamma", [1], initializer=tf.constant_initializer(0.0))
+    gamma = tf.compat.v1.get_variable("gamma", [1], initializer=tf.constant_initializer(0.0))
 
     o = tf.reshape(o, shape=x.shape)  # [bs, h, w, C]
     x = gamma * o + x
@@ -284,8 +284,8 @@ def _spectral_norm(w, iteration=1):
     w_shape = w.shape.as_list()
     w = tf.reshape(w, [-1, w_shape[-1]])
 
-    u = tf.get_variable("u", [1, w_shape[-1]], initializer=tf.random_normal_initializer(), trainable=False)
-
+    u = tf.compat.v1.get_variable("u", [1, w_shape[-1]], initializer=tf.random_normal_initializer(), trainable=False)
+    
     u_hat = u
     v_hat = None
     for i in range(iteration):
