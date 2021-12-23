@@ -161,12 +161,19 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     dslr_abs = tf.abs(dslr_fft)
     dslr_angle = tf.math.angle(dslr_fft)
 
+    # diff_angle = tf.abs(tf.math.subtract(enhanced_angle, dslr_angle))
+    # abs_angle = tf.minimum(
+    #     diff_angle,
+    #     tf.math.subtract(2*np.pi, diff_angle)
+    # )
+    
+    loss_fourier = tf.reduce_mean(tf.abs(tf.math.subtract(enhanced_fft, dslr_fft))) # + \
+                #    1/2 * tf.reduce_mean(abs_angle)
+    
+    loss_list.append(loss_fourier)
+    loss_text.append("loss_fourier")
     if fac_fourier > 0:
-        loss_fourier = 1/2 * tf.reduce_mean(tf.abs(enhanced_abs - dslr_abs)) + \
-                       1/2 * tf.reduce_mean(tf.abs(enhanced_angle - dslr_angle))
         loss_generator += loss_fourier * fac_fourier
-        loss_list.append(loss_fourier)
-        loss_text.append("loss_fourier")
 
     if fac_frequency > 0:
         frequency_real = tf.stack([dslr_abs, dslr_angle], axis=2)
@@ -387,7 +394,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
             if fac_frequency > 0:
                 logs_gen += " | frequency_d loss: %.4g; n_frequency_d: %.4g" % (val_loss_frequency_d, n_frequency_d_)
             if fac_unet > 0:
-                logs_gen += " | unet_d loss: %.4g; n_frequency_d: %.4g" % (val_loss_unet_d, n_unet_d_)
+                logs_gen += " | unet_d loss: %.4g; n_unet_d: %.4g" % (val_loss_unet_d, n_unet_d_)
 
             print(logs_gen)
 
@@ -418,6 +425,8 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
                 n_texture_d_ = 0.0
             if fac_frequency > 0:
                 n_frequency_d_ = 0.0
+            if fac_unet > 0:
+                n_unet_d_ = 0.0
 
         # Loading new training data
         if i % 1000 == 0 and i > 0:
