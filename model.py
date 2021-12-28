@@ -4,31 +4,32 @@
 
 import tensorflow as tf
 import numpy as np
+from tensorflow.python.ops.gen_nn_ops import max_pool
 
 
-def dped_g(input_image, leaky = True, instance_norm = True, flat = 0):
+def dped_g(input_image, leaky = True, norm = 'instance', flat = 0):
     with tf.compat.v1.variable_scope("generator"):
         if flat > 0:
-            conv1 = _conv_layer(input_image, 64, flat, 2, instance_norm = False, leaky = leaky)
+            conv1 = _conv_layer(input_image, 64, flat, 2, norm = 'none', leaky = leaky)
         else:
-            conv1 = _conv_layer(input_image, 64, 9, 1, instance_norm = False, leaky = leaky)
+            conv1 = _conv_layer(input_image, 64, 9, 1, norm = 'none', leaky = leaky)
         
-        conv_b1a = _conv_layer(conv1, 64, 3, 1, instance_norm = instance_norm, leaky = leaky)
-        conv_b1b = _conv_layer(conv_b1a, 64, 3, 1, instance_norm = instance_norm, leaky = leaky) + conv1
+        conv_b1a = _conv_layer(conv1, 64, 3, 1, norm = norm, leaky = leaky)
+        conv_b1b = _conv_layer(conv_b1a, 64, 3, 1, norm = norm, leaky = leaky) + conv1
 
-        conv_b2a = _conv_layer(conv_b1b, 64, 3, 1, instance_norm = instance_norm, leaky = leaky)
-        conv_b2b = _conv_layer(conv_b2a, 64, 3, 1, instance_norm = instance_norm, leaky = leaky) + conv_b1b
+        conv_b2a = _conv_layer(conv_b1b, 64, 3, 1, norm = norm, leaky = leaky)
+        conv_b2b = _conv_layer(conv_b2a, 64, 3, 1, norm = norm, leaky = leaky) + conv_b1b
 
-        conv_b3a = _conv_layer(conv_b2b, 64, 3, 1, instance_norm = instance_norm, leaky = leaky)
-        conv_b3b = _conv_layer(conv_b3a, 64, 3, 1, instance_norm = instance_norm, leaky = leaky) + conv_b2b
+        conv_b3a = _conv_layer(conv_b2b, 64, 3, 1, norm = norm, leaky = leaky)
+        conv_b3b = _conv_layer(conv_b3a, 64, 3, 1, norm = norm, leaky = leaky) + conv_b2b
 
-        conv_b4a = _conv_layer(conv_b3b, 64, 3, 1, instance_norm = instance_norm, leaky = leaky)
-        conv_b4b = _conv_layer(conv_b4a, 64, 3, 1, instance_norm = instance_norm, leaky = leaky) + conv_b3b
+        conv_b4a = _conv_layer(conv_b3b, 64, 3, 1, norm = norm, leaky = leaky)
+        conv_b4b = _conv_layer(conv_b4a, 64, 3, 1, norm = norm, leaky = leaky) + conv_b3b
 
-        conv2 = _conv_layer(conv_b4b, 64, 3, 1, instance_norm = False, leaky = leaky)
-        conv3 = _conv_layer(conv2, 64, 3, 1, instance_norm = False, leaky = leaky)
+        conv2 = _conv_layer(conv_b4b, 64, 3, 1, norm = 'none', leaky = leaky)
+        conv3 = _conv_layer(conv2, 64, 3, 1, norm = 'none', leaky = leaky)
         tconv1 = _conv_tranpose_layer(conv3, 64, 3, 2, leaky = leaky)
-        enhanced = tf.nn.tanh(_conv_layer(tconv1, 3, 9, 1, relu = False, instance_norm = False)) * 0.58 + 0.5
+        enhanced = tf.nn.tanh(_conv_layer(tconv1, 3, 9, 1, relu = False, norm = 'none')) * 0.58 + 0.5
 
     return enhanced
 
@@ -36,7 +37,7 @@ def texture_d(image_, activation=True):
 
     with tf.compat.v1.variable_scope("texture_d"):
 
-        conv1 = _conv_layer(image_, 48, 11, 4, instance_norm = False)
+        conv1 = _conv_layer(image_, 48, 11, 4, norm = 'none')
         conv2 = _conv_layer(conv1, 128, 5, 2)
         conv3 = _conv_layer(conv2, 192, 3, 1)
         conv4 = _conv_layer(conv3, 192, 3, 1)
@@ -68,26 +69,26 @@ def fourier_d(input, activation=True):
 
     return out
 
-def unet_d(input, activation=True):
+def unet_d(input, activation=True, norm='instance'):
     with tf.compat.v1.variable_scope("unet_d"):
         ch = 64
         sn = True
 
-        x = _resblock_down(input, ch, use_bias = False, sn=sn) #128
+        x = _resblock_down(input, ch, use_bias = False, sn=sn, norm=norm) #128
         ch = ch*2
 
-        x = _resblock_down(x, ch, use_bias = False, sn=sn) #64
+        x = _resblock_down(x, ch, use_bias = False, sn=sn, norm=norm) #64
 
         x = _self_attention(x, ch, sn)
         ch = ch*2
 
-        x = _resblock_down(x, ch, use_bias = False, sn=sn) #32
+        x = _resblock_down(x, ch, use_bias = False, sn=sn, norm=norm) #32
         ch = ch*2
 
-        x = _resblock_down(x, ch, use_bias = False, sn=sn) #16
-        x = _resblock_down(x, ch, use_bias = False, sn=sn) #8
+        x = _resblock_down(x, ch, use_bias = False, sn=sn, norm=norm) #16
+        x = _resblock_down(x, ch, use_bias = False, sn=sn, norm=norm) #8
 
-        x = leaky_relu(x)
+        x = tf.compat.v1.nn.leaky_relu(x)
         x = _global_sum_pool(x)
 
         flat = tf.compat.v1.layers.flatten(x)
@@ -97,16 +98,29 @@ def unet_d(input, activation=True):
             out = tf.nn.softmax(out)
         return out
 
-def _resblock_down(input, num_filters, use_bias=True, sn=False):
-    x = _instance_norm(input)
-    x = leaky_relu(x)
+def _resblock_down(input, num_filters, use_bias=True, sn=False, norm='instance'):
+    x = _switch_norm(input, norm)
+    x = tf.compat.v1.nn.leaky_relu(x)
     x = _conv_layer(x, num_filters, 3, 2, relu=False, use_bias=use_bias, sn=sn)
 
-    x = _instance_norm(x)
-    x = leaky_relu(x)
+    x = _switch_norm(x, norm)
+    x = tf.compat.v1.nn.leaky_relu(x)
     x = _conv_layer(x, num_filters, 3, 1, relu=False, use_bias=use_bias, sn=sn)
 
     input = _conv_layer(input, num_filters, 3, 2, relu=False, use_bias=use_bias, sn=sn)
+
+    return x + input
+
+def _resblock_up(input, num_filters, use_bias=True, sn=False, norm='instance'):
+    x = _switch_norm(input, norm)
+    x = tf.compat.v1.nn.leaky_relu(x)
+    x = _conv_tranpose_layer(x, num_filters, 3, 2, relu = False, use_bias = use_bias, sn=sn)
+
+    x = _switch_norm(x, norm)
+    x = tf.compat.v1.nn.leaky_relu(x)
+    x = _conv_tranpose_layer(x, num_filters, 3, 1, relu = False, use_bias = use_bias, sn=sn)
+
+    input = _conv_tranpose_layer(input, num_filters, 3, 2, relu = False, use_bias = use_bias, sn=sn)
 
     return x + input
 
@@ -122,6 +136,27 @@ def _self_attention(x, num_filters, sn=False):
     gamma = tf.Variable(tf.zeros([1]))
 
     o = tf.reshape(o, shape=x.shape)  # [bs, h, w, C]
+    x = gamma * o + x
+
+    return x
+
+def _self_attention_v2(x, num_filters, sn=False):
+    f = _conv_layer(x, num_filters=num_filters//8, filter_size=1, strides=1, relu=False, use_bias=False, sn=sn)
+    f = _max_pool(f, 2)
+
+    g = _conv_layer(x, num_filters=num_filters//8, filter_size=1, strides=1, relu=False, use_bias=False, sn=sn)
+
+    h = _conv_layer(x, num_filters=num_filters, filter_size=1, strides=1, relu=False, use_bias=False, sn=sn)
+    h = _max_pool(g, 2)
+
+    s = tf.matmul(_hw_flatten(g), _hw_flatten(f), transpose_b=True)
+    beta = tf.nn.softmax(s)
+
+    o = tf.matmul(beta, _hw_flatten(h))
+    gamma = tf.Variable(tf.zeros([1]))
+
+    o = tf.reshape(o, shape=x.shape)  # [bs, h, w, C]
+    o = _conv_layer(o, num_filters, 1, 1, relu=False, sn=sn)
     x = gamma * o + x
 
     return x
@@ -143,34 +178,31 @@ def bias_variable(shape, name):
     initial = tf.constant(0.01, shape=shape)
     return tf.Variable(initial, name=name)
 
-def leaky_relu(x, alpha = 0.2):
-    return tf.maximum(alpha * x, x)
+def _conv_multi_block(input, max_size, num_maps, norm):
 
-def _conv_multi_block(input, max_size, num_maps, instance_norm):
-
-    conv_3a = _conv_layer(input, num_maps, 3, 1, relu=True, instance_norm=instance_norm)
-    conv_3b = _conv_layer(conv_3a, num_maps, 3, 1, relu=True, instance_norm=instance_norm)
+    conv_3a = _conv_layer(input, num_maps, 3, 1, relu=True, norm=norm)
+    conv_3b = _conv_layer(conv_3a, num_maps, 3, 1, relu=True, norm=norm)
 
     output_tensor = conv_3b
 
     if max_size >= 5:
 
-        conv_5a = _conv_layer(input, num_maps, 5, 1, relu=True, instance_norm=instance_norm)
-        conv_5b = _conv_layer(conv_5a, num_maps, 5, 1, relu=True, instance_norm=instance_norm)
+        conv_5a = _conv_layer(input, num_maps, 5, 1, relu=True, norm=norm)
+        conv_5b = _conv_layer(conv_5a, num_maps, 5, 1, relu=True, norm=norm)
 
         output_tensor = stack(output_tensor, conv_5b)
 
     if max_size >= 7:
 
-        conv_7a = _conv_layer(input, num_maps, 7, 1, relu=True, instance_norm=instance_norm)
-        conv_7b = _conv_layer(conv_7a, num_maps, 7, 1, relu=True, instance_norm=instance_norm)
+        conv_7a = _conv_layer(input, num_maps, 7, 1, relu=True, norm=norm)
+        conv_7b = _conv_layer(conv_7a, num_maps, 7, 1, relu=True, norm=norm)
 
         output_tensor = stack(output_tensor, conv_7b)
 
     if max_size >= 9:
 
-        conv_9a = _conv_layer(input, num_maps, 9, 1, relu=True, instance_norm=instance_norm)
-        conv_9b = _conv_layer(conv_9a, num_maps, 9, 1, relu=True, instance_norm=instance_norm)
+        conv_9a = _conv_layer(input, num_maps, 9, 1, relu=True, norm=norm)
+        conv_9b = _conv_layer(conv_9a, num_maps, 9, 1, relu=True, norm=norm)
 
         output_tensor = stack(output_tensor, conv_9b)
 
@@ -185,7 +217,7 @@ def conv2d(x, W):
     return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
 
 
-def _conv_layer(net, num_filters, filter_size, strides, relu=True, instance_norm=False, padding='SAME', leaky = True, use_bias=True, sn=False):
+def _conv_layer(net, num_filters, filter_size, strides, relu=True, norm='none', padding='SAME', leaky = True, use_bias=True, sn=False):
 
     weights_init = _conv_init_vars(net, num_filters, filter_size)
     strides_shape = [1, strides, strides, 1]
@@ -199,8 +231,7 @@ def _conv_layer(net, num_filters, filter_size, strides, relu=True, instance_norm
         bias = tf.Variable(tf.constant(0.01, shape=[num_filters]))
         net = tf.nn.bias_add(net, bias)
 
-    if instance_norm:
-        net = _instance_norm(net)
+    net = _switch_norm(net, norm)
 
     if relu:
         if leaky:
@@ -211,8 +242,18 @@ def _conv_layer(net, num_filters, filter_size, strides, relu=True, instance_norm
     return net
 
 
-def _instance_norm(net):
+def _switch_norm(net, norm):
+    if norm == 'instance':
+        return _instance_norm(net)
+    elif norm == 'group':
+        return _group_norm(net)
+    elif norm == 'none':
+        return net
+    else:
+        print("Norm not recognized, using none")
+        return net
 
+def _instance_norm(net):
     batch, rows, cols, channels = [i for i in net.get_shape()]
     var_shape = [channels]
 
@@ -224,6 +265,22 @@ def _instance_norm(net):
     normalized = (net-mu)/(sigma_sq + epsilon)**(.5)
 
     return scale * normalized + shift
+
+def _group_norm(x, G=32, eps=1e-5) :
+    N, H, W, C = x.get_shape().as_list()
+    G = min(G, C)
+
+    x = tf.reshape(x, [N, H, W, G, C // G])
+    mean, var = tf.compat.v1.nn.moments(x, [1, 2, 4], keep_dims=True)
+    x = (x - mean) / tf.sqrt(var + eps)
+
+    gamma = tf.Variable(tf.constant(1.0, shape = [1, 1, 1, C]))
+    beta = tf.Variable(tf.constant(0.0, shape = [1, 1, 1, C]))
+
+    x = tf.reshape(x, [N, H, W, C]) * gamma + beta
+
+    return x
+
 
 def _fully_connected_layer(net, num_weights, relu=True):
     batch, channels = [i for i in net.get_shape()]
@@ -240,7 +297,6 @@ def _fully_connected_layer(net, num_weights, relu=True):
     return out
 
 
-
 def _conv_init_vars(net, out_channels, filter_size, transpose=False):
 
     _, rows, cols, in_channels = [i for i in net.get_shape()]
@@ -254,7 +310,7 @@ def _conv_init_vars(net, out_channels, filter_size, transpose=False):
     return weights_init
 
 
-def _conv_tranpose_layer(net, num_filters, filter_size, strides, leaky = True):
+def _conv_tranpose_layer(net, num_filters, filter_size, strides, relu=True, leaky = True, use_bias=True, sn=False):
     weights_init = _conv_init_vars(net, num_filters, filter_size, transpose=True)
 
     batch_size, rows, cols, in_channels = [i for i in net.get_shape()]
@@ -264,13 +320,27 @@ def _conv_tranpose_layer(net, num_filters, filter_size, strides, leaky = True):
     tf_shape = tf.stack(new_shape)
 
     strides_shape = [1, strides, strides, 1]
+
+    if sn:
+        weights_init = _spectral_norm(weights_init)
+
     net = tf.nn.conv2d_transpose(net, weights_init, tf_shape, strides_shape, padding='SAME')
 
-    if leaky:
-        return tf.compat.v1.nn.leaky_relu(net)
-    else:
-        return tf.compat.v1.nn.relu(net)
+    if use_bias:
+        bias = tf.Variable(tf.constant(0.01, shape=[num_filters]))
+        net = tf.nn.bias_add(net, bias)
+    if relu:
+        if leaky:
+            net = tf.compat.v1.nn.leaky_relu(net)
+        else:
+            net = tf.compat.v1.nn.relu(net)
+    
+    return net
 
+def _nearest_neighbor(net, factor=2):
+    batch_size, rows, cols, in_channels = [i for i in net.get_shape()]
+    new_size = [rows * factor, cols * factor]
+    return tf.compat.v1.image.resize_nearest_neighbor(net, new_size)
 
 def _max_pool(x, n):
     return tf.nn.max_pool(x, ksize=[1, n, n, 1], strides=[1, n, n, 1], padding='VALID')
@@ -287,10 +357,6 @@ def _spectral_norm(w, iteration=1):
     u_hat = u
     v_hat = None
     for i in range(iteration):
-        """
-        power iteration
-        Usually iteration = 1 will be enough
-        """
         v_ = tf.matmul(u_hat, tf.transpose(w))
         v_hat = tf.nn.l2_normalize(v_)
 

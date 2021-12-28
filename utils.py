@@ -37,7 +37,8 @@ def process_command_args(arguments):
     # --- more options ---
     save_mid_imgs = False
     leaky = True
-    norm_gen = True
+    norm_gen = 'instance'
+    norm_disc = 'instance'
     flat = 0
     percentage = 100
     entropy='no'
@@ -124,7 +125,9 @@ def process_command_args(arguments):
         if args.startswith("leaky"):
             leaky = eval(args.split("=")[1])
         if args.startswith("norm_gen"):
-            norm_gen = eval(args.split("=")[1])
+            norm_gen = args.split("=")[1]
+        if args.startswith("norm_disc"):
+            norm_disc = args.split("=")[1]
         if args.startswith("flat"):
             flat = int(args.split("=")[1])
         if args.startswith("percentage"):
@@ -194,6 +197,8 @@ def process_command_args(arguments):
     print("The following parameters will be applied for training:")
     print("Restore Iteration: " + str(restore_iter))
     print("Flat: " + str(flat))
+    print("Generator norm" + norm_gen)
+    print("Discriminator norm" + norm_disc)
     print("Training data pecentage: " + str(percentage))
     print("Sort training images by entropy: " + entropy)
     print("Mixing number of images: " + str(mix))
@@ -224,7 +229,7 @@ def process_command_args(arguments):
         " unet:" + str(fac_unet) )
     return dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir, restore_iter,\
         patch_w, patch_h, batch_size, train_size, learning_rate, eval_step, num_train_iters, \
-        save_mid_imgs, leaky, norm_gen, flat, percentage, entropy, mix, optimizer,\
+        save_mid_imgs, leaky, norm_gen, norm_disc, flat, percentage, entropy, mix, optimizer,\
         fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips, fac_huber, fac_unet
 
 
@@ -240,7 +245,7 @@ def process_test_model_args(arguments):
     # --- architecture ---
     arch = "resnet"
     level = 0
-    inst_norm = False
+    norm_gen = 'instance'
     num_maps_base = 16
     # --- model weights ---
     orig_model = False
@@ -277,8 +282,8 @@ def process_test_model_args(arguments):
         if args.startswith("level"):
             level = 0 if arch == "pynet_0" else int(args.split("=")[1])
 
-        if args.startswith("inst_norm"):
-            inst_norm = eval(args.split("=")[1])
+        if args.startswith("norm_gen"):
+            norm_gen = args.split("=")[1]
 
         if args.startswith("num_maps_base"):
             num_maps_base = int(args.split("=")[1])
@@ -336,7 +341,7 @@ def process_test_model_args(arguments):
     print("Path to testing data: " + test_dir)
 
     return dataset_dir, test_dir, model_dir, result_dir,\
-        arch, level, inst_norm, num_maps_base, flat, orig_model, rand_param, restore_iter,\
+        arch, level, norm_gen, num_maps_base, flat, orig_model, rand_param, restore_iter,\
             img_h, img_w, use_gpu, save_model, test_image
 
 

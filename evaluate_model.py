@@ -15,7 +15,7 @@ import sys
 import niqe
 import lpips_tf
 
-dataset_dir, test_dir, model_dir, result_dir, arch, LEVEL, inst_norm, num_maps_base, flat,\
+dataset_dir, test_dir, model_dir, result_dir, arch, LEVEL, norm_gen, num_maps_base, flat,\
     orig_model, rand_param, restore_iter, IMAGE_HEIGHT, IMAGE_WIDTH, use_gpu, save_model, test_image = \
         utils.process_test_model_args(sys.argv)
 
@@ -63,7 +63,7 @@ with tf.compat.v1.Session(config=config) as sess:
     phone_ = tf.compat.v1.placeholder(tf.float32, [batch_size, PATCH_HEIGHT, PATCH_WIDTH, PATCH_DEPTH])
     dslr_ = tf.compat.v1.placeholder(tf.float32, [batch_size, TARGET_HEIGHT, TARGET_WIDTH, TARGET_DEPTH])
 
-    enhanced = dped_g(phone_, flat=flat)
+    enhanced = dped_g(phone_, flat=flat, norm=norm_gen)
     saver = tf.compat.v1.train.Saver()
 
     dslr_gray = tf.image.rgb_to_grayscale(dslr_)
@@ -122,6 +122,12 @@ with tf.compat.v1.Session(config=config) as sess:
     loss_huber = tf.reduce_mean(0.5*tf.math.square(quadratic)+linear)
     loss_list.append(loss_huber)
     loss_text.append("loss_huber")
+
+    # ## Total variation loss
+    # loss_tv = tf.reduce_mean(tf.image.total_variation(enhanced))
+    # loss_list.append(loss_tv)
+    # loss_text.append("loss_tv")
+
 
     niqe = niqe.create_evaluator()
 

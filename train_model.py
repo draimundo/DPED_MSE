@@ -25,7 +25,7 @@ from RAdam import RAdamOptimizer
 # Processing command arguments
 dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir, restore_iter,\
 patch_w, patch_h, batch_size, train_size, learning_rate, eval_step, num_train_iters, \
-save_mid_imgs, leaky, norm_gen, flat, percentage, entropy, mix, optimizer,\
+save_mid_imgs, leaky, norm_gen, norm_disc, flat, percentage, entropy, mix, optimizer,\
 fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips, fac_huber, fac_unet \
     = utils.process_command_args(sys.argv)
 
@@ -60,7 +60,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     dslr_ = tf.compat.v1.placeholder(tf.float32, [batch_size, TARGET_HEIGHT, TARGET_WIDTH, TARGET_DEPTH])
 
     # Get the processed enhanced image
-    enhanced = dped_g(phone_, leaky = leaky, instance_norm = norm_gen, flat = flat)
+    enhanced = dped_g(phone_, leaky = leaky, norm = norm_gen, flat = flat)
 
     # Losses
     dslr_gray = tf.image.rgb_to_grayscale(dslr_)
@@ -193,8 +193,8 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
         adv_real = dslr_
         adv_fake = enhanced
 
-        pred_real = unet_d(adv_real, activation=False)
-        pred_fake = unet_d(adv_fake, activation=False)
+        pred_real = unet_d(adv_real, activation=False, norm=norm_disc)
+        pred_fake = unet_d(adv_fake, activation=False, norm=norm_disc)
 
         loss_unet_g = -tf.reduce_mean(tf.math.log(tf.clip_by_value(tf.nn.sigmoid(pred_fake - pred_real), 1e-10, 1.0)))
         loss_unet_d = -tf.reduce_mean(tf.math.log(tf.clip_by_value(tf.nn.sigmoid(pred_real - pred_fake), 1e-10, 1.0)))

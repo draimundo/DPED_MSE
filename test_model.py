@@ -16,7 +16,7 @@ from tqdm import tqdm
 from datetime import datetime
 from load_dataset import extract_bayer_channels
 
-dataset_dir, test_dir, model_dir, result_dir, arch, LEVEL, inst_norm, num_maps_base, flat,\
+dataset_dir, test_dir, model_dir, result_dir, arch, LEVEL, norm_gen, num_maps_base, flat,\
     orig_model, rand_param, restore_iter, IMAGE_HEIGHT, IMAGE_WIDTH, use_gpu, save_model, test_image = \
         utils.process_test_model_args(sys.argv)
 
@@ -38,8 +38,6 @@ TARGET_WIDTH = IMAGE_WIDTH
 
 PATCH_HEIGHT = int(np.floor(IMAGE_HEIGHT//FAC_PATCH))
 PATCH_WIDTH = int(np.floor(IMAGE_WIDTH//FAC_PATCH))
-
-
 
 
 # Disable gpu if specified
@@ -64,7 +62,7 @@ with tf.compat.v1.Session(config=config) as sess:
 
 
     # generate enhanced image
-    enhanced = dped_g(x_, flat=flat)
+    enhanced = dped_g(x_, flat=flat, norm=norm_gen)
 
 
     # Determine model weights
