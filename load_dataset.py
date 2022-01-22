@@ -105,41 +105,70 @@ def load_val_data_exp(dataset_dir, dslr_dir, phone_dir, over_dir, under_dir, PAT
 
     return val_data, val_answ
 
-def load_test_data(dataset_dir, dslr_dir, phone_dir, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, flat = False):
+def load_test_data(dataset_dir, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, triple_exposure, over_dir, under_dir, up_exposure = False, down_exposure = False, flat = False):
 
-    test_directory_dslr = dataset_dir + 'test/' + dslr_dir
-    test_directory_phone = dataset_dir + 'test/' + phone_dir
+    test_directory_dslr = dataset_dir + 'test/fujifilm/'
+    test_directory_phone = dataset_dir + 'test/mediatek_raw/'
 
+    test_directory_over = dataset_dir + 'test/' + over_dir
+    test_directory_under = dataset_dir + 'test/' + under_dir
 
     PATCH_DEPTH = 4
     FAC_SCALE = 1
     if flat:
         PATCH_DEPTH = 1
         FAC_SCALE = 2
+    if triple_exposure:
+        PATCH_DEPTH *= 3
+    elif up_exposure or down_exposure:
+        PATCH_DEPTH *= 2
+        
 
-
-
-    # get the image format (e.g. 'png')
-    format_dslr = str.split(os.listdir(test_directory_dslr)[0],'.')[-1]
-
-    # determine test image numbers by listing all files in the folder
+    # NUM_VAL_IMAGES = 1204
     NUM_TEST_IMAGES = len([name for name in os.listdir(test_directory_phone)
                            if os.path.isfile(os.path.join(test_directory_phone, name))])
 
     test_data = np.zeros((NUM_TEST_IMAGES, PATCH_WIDTH, PATCH_HEIGHT, PATCH_DEPTH))
     test_answ = np.zeros((NUM_TEST_IMAGES, int(PATCH_WIDTH * DSLR_SCALE / FAC_SCALE), int(PATCH_HEIGHT * DSLR_SCALE / FAC_SCALE), 3))
 
-    for i in tqdm(range(0, NUM_TEST_IMAGES), miniters=100):
+    for i in tqdm(range(0, NUM_TEST_IMAGES)):
 
-        I = np.float32(np.asarray(imageio.imread((test_directory_phone + str(i) + '.png'))))
+        In = np.asarray(imageio.imread(test_directory_phone + str(i) + '.png'))
         if not flat:
-            I = extract_bayer_channels(I)
-            test_data[i, :] = I
-        else:
-            test_data[i, ..., 0] = I
+            In = extract_bayer_channels(In)
 
-        I = Image.open(test_directory_dslr + str(i) + '.' + format_dslr)
-        I = np.float32(np.reshape(I, [1, int(PATCH_WIDTH * DSLR_SCALE / FAC_SCALE), int(PATCH_HEIGHT * DSLR_SCALE / FAC_SCALE), 3])) / 255
+        if triple_exposure:
+            Io = np.asarray(imageio.imread(test_directory_over + str(i) + '.png'))
+            Iu = np.asarray(imageio.imread(test_directory_under + str(i) + '.png'))
+            if not flat:
+                Io = extract_bayer_channels(Io)
+                Iu = extract_bayer_channels(Iu)
+                test_data[i, :] = np.dstack((In, Io, Iu))
+            else:
+                test_data[i, ..., 0:PATCH_DEPTH] = np.dstack((In, Io, Iu))
+        elif down_exposure:
+            Iu = np.asarray(imageio.imread(test_directory_under + str(i) + '.png'))
+            if not flat:
+                Iu = extract_bayer_channels(Iu)
+                test_data[i, :] = np.dstack((In, Iu))
+            else:
+                test_data[i, ..., 0:PATCH_DEPTH] = np.dstack((In, Iu))
+        elif up_exposure:
+            Io = np.asarray(imageio.imread(test_directory_over + str(i) + '.png'))
+            if not flat:
+                Io = extract_bayer_channels(Io)
+                test_data[i, :] = np.dstack((In, Io))
+            else:
+                test_data[i, ..., 0:PATCH_DEPTH] = np.dstack((In, Io))
+        else:
+            if not flat:
+                test_data[i, :] = In
+            else:
+                test_data[i, ..., 0] = In
+
+        I = Image.open(test_directory_dslr + str(i) + '.png')
+        I = np.array(I.resize((int(I.size[0] * DSLR_SCALE / 2), int(I.size[1] * DSLR_SCALE / 2)), resample=Image.BICUBIC))
+        I = np.float32(np.reshape(I, [1, int(PATCH_WIDTH * DSLR_SCALE/FAC_SCALE), int(PATCH_HEIGHT * DSLR_SCALE/FAC_SCALE), 3])) / 255
         test_answ[i, :] = I
 
     return test_data, test_answ

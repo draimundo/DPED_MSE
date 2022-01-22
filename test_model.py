@@ -16,22 +16,25 @@ from tqdm import tqdm
 from datetime import datetime
 from load_dataset import extract_bayer_channels
 
-dataset_dir, test_dir, model_dir, result_dir, arch, LEVEL, norm_gen, num_maps_base, flat,\
-    orig_model, rand_param, restore_iter, IMAGE_HEIGHT, IMAGE_WIDTH, use_gpu, save_model, test_image = \
-        utils.process_test_model_args(sys.argv)
+dataset_dir, test_dir, model_dir, result_dir,\
+    dslr_dir, phone_dir, over_dir, under_dir, triple_exposure, up_exposure, down_exposure,\
+    arch, level, norm_gen, num_maps_base, flat, orig_model, rand_param, restore_iter,\
+    img_h, img_w, use_gpu, save_model, test_image = utils.process_test_model_args(sys.argv)
 
-DSLR_SCALE = float(1) / (2 ** (max(LEVEL,0) - 1))
+DSLR_SCALE = float(1) / (2 ** (max(level,0) - 1))
 MAX_SCALE = float(1) / (2 ** (5 - 1))
 IMAGE_HEIGHT, IMAGE_WIDTH = 3000, 4000
 TARGET_DEPTH = 3
-print(flat)
 if flat:
     FAC_PATCH = 1
     PATCH_DEPTH = 1
 else:
     FAC_PATCH = 2
     PATCH_DEPTH = 4
-
+if triple_exposure:
+    PATCH_DEPTH *= 3
+elif up_exposure or down_exposure:
+    PATCH_DEPTH *= 2
 
 TARGET_HEIGHT = IMAGE_HEIGHT
 TARGET_WIDTH = IMAGE_WIDTH
@@ -69,7 +72,9 @@ with tf.compat.v1.Session(config=config) as sess:
     saver = tf.compat.v1.train.Saver()
 
     # Processing full-resolution RAW images
-    test_dir_full = 'validation_full_resolution_visual_data/mediatek_raw_normal/'
+    test_dir_full = 'validation_full_resolution_visual_data/' + phone_dir
+    test_dir_over = 'validation_full_resolution_visual_data/' + over_dir
+    test_dir_under = 'validation_full_resolution_visual_data/' + under_dir
 
     test_photos = [f for f in os.listdir(test_dir_full) if os.path.isfile(test_dir_full + f)]
     test_photos.sort()
@@ -80,12 +85,30 @@ with tf.compat.v1.Session(config=config) as sess:
         print("Processing image " + photo)
 
         In = np.asarray(rawpy.imread((test_dir_full + photo)).raw_image.astype(np.float32))
-        if not flat:
-            In = extract_bayer_channels(In)
-            images[i,...] = In[0:PATCH_HEIGHT, 0:PATCH_WIDTH, ...]
+        In = extract_bayer_channels(In)
+
+        if triple_exposure:
+            Io = np.asarray(rawpy.imread((test_dir_over + photo)).raw_image.astype(np.float32))
+            Io = extract_bayer_channels(Io)
+
+            Iu = np.asarray(rawpy.imread((test_dir_full + photo)).raw_image.astype(np.float32))
+            Iu = extract_bayer_channels(Iu)
+
+            I = np.dstack((In, Io, Iu))
+        elif up_exposure:
+            Io = np.asarray(rawpy.imread((test_dir_over + photo)).raw_image.astype(np.float32))
+            Io = extract_bayer_channels(Io)
+
+            I = np.dstack((In, Io))
+        elif down_exposure:
+            Iu = np.asarray(rawpy.imread((test_dir_full + photo)).raw_image.astype(np.float32))
+            Iu = extract_bayer_channels(Iu)
+
+            I = np.dstack((In, Iu))
         else:
-            images[i,..., 0] = In[0:PATCH_HEIGHT, 0:PATCH_WIDTH, ...]
-        
+            I = In
+
+        images[i,...] = I[0:PATCH_HEIGHT, 0:PATCH_WIDTH, ...]
     print("Images loaded")
     # Run inference
 

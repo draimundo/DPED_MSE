@@ -45,7 +45,13 @@ def process_command_args(arguments):
     mix = 0
     optimizer='radam'
 
-    default_facs = True
+    over_dir = 'mediatek_raw_over/'
+    under_dir = 'mediatek_raw_under/'
+    triple_exposure = False
+    up_exposure = False
+    down_exposure = False
+
+    default_facs = False
     fac_mse = 0
     fac_l1 = 0
     fac_ssim = 0
@@ -176,6 +182,18 @@ def process_command_args(arguments):
             fac_unet = float(args.split("=")[1])
             default_facs = False
 
+        if args.startswith("triple_exposure"):
+            triple_exposure = eval(args.split("=")[1])
+        if args.startswith("up_exposure"):
+            up_exposure = eval(args.split("=")[1])
+        if args.startswith("down_exposure"):
+            down_exposure = eval(args.split("=")[1])
+        if args.startswith("over_dir"):
+            over_dir = args.split("=")[1]
+        if args.startswith("under_dir"):
+            under_dir = args.split("=")[1]
+
+
     if default_facs:
         fac_vgg = 0.5
         fac_mse = 200
@@ -197,8 +215,8 @@ def process_command_args(arguments):
     print("The following parameters will be applied for training:")
     print("Restore Iteration: " + str(restore_iter))
     print("Flat: " + str(flat))
-    print("Generator norm" + norm_gen)
-    print("Discriminator norm" + norm_disc)
+    print("Generator norm: " + norm_gen)
+    print("Discriminator norm: " + norm_disc)
     print("Training data pecentage: " + str(percentage))
     print("Sort training images by entropy: " + entropy)
     print("Mixing number of images: " + str(mix))
@@ -209,6 +227,12 @@ def process_command_args(arguments):
     print("Training iterations: " + str(num_train_iters))
     print("Evaluation step: " + str(eval_step))
     print("Path to the dataset: " + dataset_dir)
+    print("Triple exposure: " + str(triple_exposure))
+    print("Up exposure: " + str(up_exposure))
+    print("Down exposure: " + str(down_exposure))
+    if triple_exposure:
+        print("Path to the over dir: " + over_dir)
+        print("Path to the under dir: " + under_dir)
     print("Path to Raw-to-RGB model network: " + model_dir)
     print("Path to result images: " + result_dir)
     print("Path to VGG-19 network: " + vgg_dir)
@@ -228,6 +252,7 @@ def process_command_args(arguments):
         " huber:" + str(fac_huber) +
         " unet:" + str(fac_unet) )
     return dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir, restore_iter,\
+        triple_exposure, up_exposure, down_exposure, over_dir, under_dir,\
         patch_w, patch_h, batch_size, train_size, learning_rate, eval_step, num_train_iters, \
         save_mid_imgs, leaky, norm_gen, norm_disc, flat, percentage, entropy, mix, optimizer,\
         fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips, fac_huber, fac_unet
@@ -241,7 +266,17 @@ def process_test_model_args(arguments):
     dataset_dir = 'raw_images/'
     test_dir = 'fujifilm_full_resolution/'
     model_dir = 'models/'
-    result_dir = 'results/'
+    result_dir = None
+
+    dslr_dir = 'fujifilm/'
+    phone_dir = 'mediatek_raw/'
+    over_dir = 'mediatek_raw_over/'
+    under_dir = 'mediatek_raw_under/'
+
+    triple_exposure = False
+    up_exposure = False
+    down_exposure = False
+
     # --- architecture ---
     arch = "resnet"
     level = 0
@@ -275,6 +310,19 @@ def process_test_model_args(arguments):
         if args.startswith("result_dir"):
             result_dir = args.split("=")[1]
         
+        if args.startswith("dslr_dir"):
+            dslr_dir = args.split("=")[1]
+
+        if args.startswith("phone_dir"):
+            phone_dir = args.split("=")[1]
+
+        if args.startswith("over_dir"):
+            over_dir = args.split("=")[1]
+
+        if args.startswith("under_dir"):
+            under_dir = args.split("=")[1]
+
+
         # --- architecture ---
         if args.startswith("arch"):
             arch = args.split("=")[1]
@@ -322,6 +370,9 @@ def process_test_model_args(arguments):
     if arch == "resnet":
         name_model = "resnet"
 
+    if result_dir is None:
+        result_dir = model_dir
+
     # obtain restore iteration info (necessary if no pre-trained model or not random weights)
     if restore_iter is None and not orig_model and not rand_param: # need to restore a model
 
@@ -340,6 +391,16 @@ def process_test_model_args(arguments):
     print("Path to result images: " + result_dir)
     print("Path to testing data: " + test_dir)
 
+
+    print("Up exposure: " + str(up_exposure))
+    print("Down exposure: " + str(down_exposure))
+    print("Triple exposure: " + str(triple_exposure))
+    if triple_exposure:
+        print("Path to the over dir: " + over_dir)
+        print("Path to the under dir: " + under_dir)
+
+    return dataset_dir, test_dir, model_dir, result_dir,\
+        dslr_dir, phone_dir, over_dir, under_dir, triple_exposure, up_exposure, down_exposure,\
     return dataset_dir, test_dir, model_dir, result_dir,\
         arch, level, norm_gen, num_maps_base, flat, orig_model, rand_param, restore_iter,\
             img_h, img_w, use_gpu, save_model, test_image

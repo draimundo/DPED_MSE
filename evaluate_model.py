@@ -15,9 +15,10 @@ import sys
 import niqe
 import lpips_tf
 
-dataset_dir, test_dir, model_dir, result_dir, arch, LEVEL, norm_gen, num_maps_base, flat,\
-    orig_model, rand_param, restore_iter, IMAGE_HEIGHT, IMAGE_WIDTH, use_gpu, save_model, test_image = \
-        utils.process_test_model_args(sys.argv)
+dataset_dir, test_dir, model_dir, result_dir,\
+    dslr_dir, phone_dir, over_dir, under_dir, triple_exposure, up_exposure, down_exposure,\
+    arch, level, norm_gen, num_maps_base, flat, orig_model, rand_param, restore_iter,\
+    img_h, img_w, use_gpu, save_model, test_image = utils.process_test_model_args(sys.argv)
 
 if flat:
     FAC_PATCH = 1
@@ -25,6 +26,10 @@ if flat:
 else:
     FAC_PATCH = 2
     PATCH_DEPTH = 4
+if triple_exposure:
+    PATCH_DEPTH *= 3
+elif up_exposure or down_exposure:
+    PATCH_DEPTH *= 2
 
 LEVEL = 0
 DSLR_SCALE = float(1) / (2 ** (max(LEVEL,0) - 1))
@@ -50,7 +55,7 @@ batch_size = 10
 use_gpu = True
 
 print("Loading testing data...")
-test_data, test_answ = load_test_data(dataset_dir, dslr_dir, phone_dir, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, flat)
+test_data, test_answ = load_test_data(dataset_dir, dslr_dir, phone_dir, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, triple_exposure, over_dir, under_dir, up_exposure, down_exposure, flat)
 print("Testing data was loaded\n")
 
 TEST_SIZE = test_data.shape[0]
