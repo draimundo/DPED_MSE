@@ -277,7 +277,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
 
     # Loading training and validation data
     print("Loading validation data...")
-    val_data, val_answ = load_val_data(dataset_dir, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, triple_exposure, over_dir, under_dir, up_exposure, down_exposure, flat)
+    val_data, val_answ = load_val_data(dataset_dir, dslr_dir, phone_dir, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, triple_exposure, over_dir, under_dir, up_exposure, down_exposure, flat)
     print("Validation data was loaded\n")
 
     print("Loading training data...")
