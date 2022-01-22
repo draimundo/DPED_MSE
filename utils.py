@@ -401,9 +401,8 @@ def process_test_model_args(arguments):
 
     return dataset_dir, test_dir, model_dir, result_dir,\
         dslr_dir, phone_dir, over_dir, under_dir, triple_exposure, up_exposure, down_exposure,\
-    return dataset_dir, test_dir, model_dir, result_dir,\
         arch, level, norm_gen, num_maps_base, flat, orig_model, rand_param, restore_iter,\
-            img_h, img_w, use_gpu, save_model, test_image
+        img_h, img_w, use_gpu, save_model, test_image
 
 
 def get_last_iter(model_dir, name_model):
