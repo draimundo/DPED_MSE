@@ -114,7 +114,10 @@ with tf.compat.v1.Session(config=config) as sess:
             images[i,..., 0:PATCH_DEPTH] = I[0:PATCH_HEIGHT, 0:PATCH_WIDTH, ...]
         else:
             I = In
-            images[i,..., 0] = I[0:PATCH_HEIGHT, 0:PATCH_WIDTH, ...]
+            if flat:
+                images[i,..., 0] = I[0:PATCH_HEIGHT, 0:PATCH_WIDTH, ...]
+            else:
+                images[i,..., 0:PATCH_DEPTH] = I[0:PATCH_HEIGHT, 0:PATCH_WIDTH, ...]
         
     print("Images loaded")
     # Run inference
