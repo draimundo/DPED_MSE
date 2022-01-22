@@ -85,24 +85,28 @@ with tf.compat.v1.Session(config=config) as sess:
         print("Processing image " + photo)
 
         In = np.asarray(rawpy.imread((test_dir_full + photo)).raw_image.astype(np.float32))
-        In = extract_bayer_channels(In)
+        if not flat:
+            In = extract_bayer_channels(In)
 
         if triple_exposure:
             Io = np.asarray(rawpy.imread((test_dir_over + photo)).raw_image.astype(np.float32))
-            Io = extract_bayer_channels(Io)
-
             Iu = np.asarray(rawpy.imread((test_dir_full + photo)).raw_image.astype(np.float32))
-            Iu = extract_bayer_channels(Iu)
+
+            if not flat:
+                Io = extract_bayer_channels(Io)
+                Iu = extract_bayer_channels(Iu)
 
             I = np.dstack((In, Io, Iu))
         elif up_exposure:
             Io = np.asarray(rawpy.imread((test_dir_over + photo)).raw_image.astype(np.float32))
-            Io = extract_bayer_channels(Io)
+            if not flat:
+                Io = extract_bayer_channels(Io)
 
             I = np.dstack((In, Io))
         elif down_exposure:
             Iu = np.asarray(rawpy.imread((test_dir_full + photo)).raw_image.astype(np.float32))
-            Iu = extract_bayer_channels(Iu)
+            if not flat:
+                Iu = extract_bayer_channels(Iu)
 
             I = np.dstack((In, Iu))
         else:
