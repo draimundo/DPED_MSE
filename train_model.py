@@ -24,6 +24,7 @@ from RAdam import RAdamOptimizer
 
 # Processing command arguments
 dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir, restore_iter,\
+triple_exposure, up_exposure, down_exposure, over_dir, under_dir,\
 patch_w, patch_h, batch_size, train_size, learning_rate, eval_step, num_train_iters, \
 save_mid_imgs, leaky, norm_gen, norm_disc, flat, percentage, entropy, mix, optimizer,\
 fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips, fac_huber, fac_unet \
@@ -36,6 +37,11 @@ if flat:
 else:
     FAC_PATCH = 2
     PATCH_DEPTH = 4
+if triple_exposure:
+    PATCH_DEPTH *= 3
+elif up_exposure or down_exposure:
+    PATCH_DEPTH *= 2
+
 
 PATCH_WIDTH = patch_w//FAC_PATCH
 PATCH_HEIGHT = patch_h//FAC_PATCH
@@ -271,11 +277,11 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
 
     # Loading training and validation data
     print("Loading validation data...")
-    val_data, val_answ = load_val_data(dataset_dir, dslr_dir, phone_dir, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, flat)
+    val_data, val_answ = load_val_data(dataset_dir, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, triple_exposure, over_dir, under_dir, up_exposure, down_exposure, flat)
     print("Validation data was loaded\n")
 
     print("Loading training data...")
-    train_data, train_answ = load_train_patch(dataset_dir, dslr_dir, phone_dir, train_size, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, flat, percentage, entropy, mix)
+    train_data, train_answ = load_train_patch(dataset_dir, dslr_dir, phone_dir, train_size, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, triple_exposure, over_dir, under_dir, up_exposure, down_exposure, flat, percentage, entropy, mix)
     print("Training data was loaded\n")
 
     VAL_SIZE = val_data.shape[0]
@@ -429,9 +435,8 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
                 n_unet_d_ = 0.0
 
         # Loading new training data
-        if i % 1000 == 0 and i > 0:
+        if i % 1000 == 0  and i > 0:
             del train_data
             del train_answ
-            train_data, train_answ = load_train_patch(dataset_dir, dslr_dir, phone_dir, train_size, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, flat, percentage, entropy, mix)
-
+            train_data, train_answ = load_train_patch(dataset_dir, dslr_dir, phone_dir, train_size, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, triple_exposure, over_dir, under_dir, up_exposure, down_exposure, flat, percentage, entropy, mix)
     print('total train/eval time:', datetime.now() - time_start)

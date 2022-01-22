@@ -25,41 +25,69 @@ def extract_bayer_channels(raw):
     return RAW_norm
 
 
-def load_val_data(dataset_dir, dslr_dir, phone_dir, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, flat = False):
+def load_val_data(dataset_dir, dslr_dir, phone_dir, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, triple_exposure, over_dir, under_dir, up_exposure = False, down_exposure = False, flat=False):
 
     val_directory_dslr = dataset_dir + 'val/' + dslr_dir
     val_directory_phone = dataset_dir + 'val/' + phone_dir
 
-
-    # get the image format (e.g. 'png')
-    format_dslr = str.split(os.listdir(val_directory_dslr)[0],'.')[-1]
-
-    # determine validation image numbers by listing all files in the folder
-    NUM_VAL_IMAGES = len([name for name in os.listdir(val_directory_phone)
-                           if os.path.isfile(os.path.join(val_directory_phone, name))])
-
+    val_directory_over = dataset_dir + 'val/' + over_dir
+    val_directory_under = dataset_dir + 'val/' + under_dir
 
     PATCH_DEPTH = 4
     FAC_SCALE = 1
     if flat:
         PATCH_DEPTH = 1
         FAC_SCALE = 2
+    if triple_exposure:
+        PATCH_DEPTH *= 3
+    elif up_exposure or down_exposure:
+        PATCH_DEPTH *= 2
 
+    # NUM_VAL_IMAGES = 1204
+    NUM_VAL_IMAGES = len([name for name in os.listdir(val_directory_phone)
+                           if os.path.isfile(os.path.join(val_directory_phone, name))])
 
     val_data = np.zeros((NUM_VAL_IMAGES, PATCH_WIDTH, PATCH_HEIGHT, PATCH_DEPTH))
-    val_answ = np.zeros((NUM_VAL_IMAGES, int(PATCH_WIDTH * DSLR_SCALE / FAC_SCALE), int(PATCH_HEIGHT * DSLR_SCALE / FAC_SCALE), 3))
+    val_answ = np.zeros((NUM_VAL_IMAGES, int(PATCH_WIDTH * DSLR_SCALE/FAC_SCALE), int(PATCH_HEIGHT * DSLR_SCALE/FAC_SCALE), 3))
 
-    for i in tqdm(range(0, NUM_VAL_IMAGES), miniters=100):
+    for i in tqdm(range(0, NUM_VAL_IMAGES)):
 
-        I = np.float32(np.asarray(imageio.imread((val_directory_phone + str(i) + '.png'))))
+        In = np.asarray(imageio.imread(val_directory_phone + str(i) + '.png'))
         if not flat:
-            I = extract_bayer_channels(I)
-            val_data[i, :] = I
-        else:
-            val_data[i, ..., 0] = I
+            In = extract_bayer_channels(In)
 
-        I = Image.open(val_directory_dslr + str(i) + '.' + format_dslr)
-        I = np.float32(np.reshape(I, [1, int(PATCH_WIDTH * DSLR_SCALE / FAC_SCALE), int(PATCH_HEIGHT * DSLR_SCALE / FAC_SCALE), 3])) / 255
+        if triple_exposure:
+            Io = np.asarray(imageio.imread(val_directory_over + str(i) + '.png'))
+            Iu = np.asarray(imageio.imread(val_directory_under + str(i) + '.png'))
+            if not flat:
+                Io = extract_bayer_channels(Io)
+                Iu = extract_bayer_channels(Iu)
+                val_data[i, :] = np.dstack((In, Io, Iu))
+            else:
+                val_data[i, ..., 0:PATCH_DEPTH] = np.dstack((In, Io, Iu))
+        elif down_exposure:
+            Iu = np.asarray(imageio.imread(val_directory_under + str(i) + '.png'))
+            if not flat:
+                Iu = extract_bayer_channels(Iu)
+                val_data[i, :] = np.dstack((In, Iu))
+            else:
+                val_data[i, ..., 0:PATCH_DEPTH] = np.dstack((In, Iu))
+        elif up_exposure:
+            Io = np.asarray(imageio.imread(val_directory_over + str(i) + '.png'))
+            if not flat:
+                Io = extract_bayer_channels(Io)
+                val_data[i, :] = np.dstack((In, Io))
+            else:
+                val_data[i, ..., 0:PATCH_DEPTH] = np.dstack((In, Io))
+        else:
+            if not flat:
+                val_data[i, :] = In
+            else:
+                val_data[i, ..., 0] = In
+
+        I = Image.open(val_directory_dslr + str(i) + '.png')
+        I = np.array(I.resize((int(I.size[0] * DSLR_SCALE / 2), int(I.size[1] * DSLR_SCALE / 2)), resample=Image.BICUBIC))
+        I = np.float32(np.reshape(I, [1, int(PATCH_WIDTH * DSLR_SCALE/FAC_SCALE), int(PATCH_HEIGHT * DSLR_SCALE/FAC_SCALE), 3])) / 255
         val_answ[i, :] = I
 
     return val_data, val_answ
@@ -245,18 +273,25 @@ def load_test_data_exp(dataset_dir, dslr_dir, phone_dir, over_dir, under_dir, PA
     return test_data, test_answ
 
 
-def load_train_patch(dataset_dir, dslr_dir, phone_dir, TRAIN_SIZE, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, flat=False, percentage=100, entropy='no', mix=0):
+def load_train_patch(dataset_dir, dslr_dir, phone_dir, TRAIN_SIZE, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, triple_exposure, over_dir, under_dir, up_exposure = False, down_exposure = False, flat=False, percentage=100, entropy='no', mix=0):
     if percentage > 100:
         percentage = 100
 
     train_directory_dslr = dataset_dir + 'train/' + dslr_dir
     train_directory_phone = dataset_dir + 'train/' + phone_dir
 
+    train_directory_over = dataset_dir + 'train/' + over_dir
+    train_directory_under = dataset_dir + 'train/' + under_dir
+
     PATCH_DEPTH = 4
     FAC_SCALE = 1
     if flat:
         PATCH_DEPTH = 1
         FAC_SCALE = 2
+    if triple_exposure:
+        PATCH_DEPTH *= 3
+    elif up_exposure or down_exposure:
+        PATCH_DEPTH *= 2
         
     # get the image format (e.g. 'png')
     format_dslr = str.split(os.listdir(train_directory_dslr)[0],'.')[-1]
@@ -279,37 +314,50 @@ def load_train_patch(dataset_dir, dslr_dir, phone_dir, TRAIN_SIZE, PATCH_WIDTH, 
     train_answ = np.zeros((TRAIN_SIZE, int(PATCH_WIDTH * DSLR_SCALE / FAC_SCALE), int(PATCH_HEIGHT * DSLR_SCALE / FAC_SCALE), 3))
 
     i = 0
-    for img in tqdm(TRAIN_IMAGES, miniters=100):
+    for img in tqdm(TRAIN_IMAGES):
 
-        I = np.float32(np.asarray(imageio.imread((train_directory_phone + str(img) + '.png'))))
-        
-        if mix > 1:
-            iRand = np.random.choice(TRAIN_IMAGES, mix-1, replace=False)
-            for iMix in iRand:
-                I += np.float32(np.asarray(imageio.imread((train_directory_phone + str(iMix) + '.png'))))
-            I /= mix
-        
+        In = np.asarray(imageio.imread(train_directory_phone + str(img) + '.png'))
         if not flat:
-            I = extract_bayer_channels(I)
-            train_data[i, :] = I
+            In = extract_bayer_channels(In)
+
+        if triple_exposure:
+            Io = np.asarray(imageio.imread(train_directory_over + str(img) + '.png'))
+            Iu = np.asarray(imageio.imread(train_directory_under + str(img) + '.png'))
+            if not flat:
+                Io = extract_bayer_channels(Io)
+                Iu = extract_bayer_channels(Iu)
+                train_data[i, :] = np.dstack((In, Io, Iu))
+            else:
+                train_data[i, ..., 0:PATCH_DEPTH] = np.dstack((In, Io, Iu))
+        elif down_exposure:
+            Iu = np.asarray(imageio.imread(train_directory_under + str(img) + '.png'))
+            if not flat:
+                Iu = extract_bayer_channels(Iu)
+                train_data[i, :] = np.dstack((In, Iu))
+            else:
+                train_data[i, ..., 0:PATCH_DEPTH] = np.dstack((In, Iu))
+        elif up_exposure:
+            Io = np.asarray(imageio.imread(train_directory_over + str(img) + '.png'))
+            if not flat:
+                Io = extract_bayer_channels(Io)
+                train_data[i, :] = np.dstack((In, Io))
+            else:
+                train_data[i, ..., 0:PATCH_DEPTH] = np.dstack((In, Io))
         else:
-            train_data[i, ..., 0] = I
-        
-        
-        I = Image.open(train_directory_dslr + str(img) + '.' + format_dslr)
+            if not flat:
+                train_data[i, :] = In
+            else:
+                train_data[i, ..., 0] = In
+
+        I = Image.open(train_directory_dslr + str(img) + '.png')
+        I = np.array(I.resize((int(I.size[0] * DSLR_SCALE / 2), int(I.size[1] * DSLR_SCALE / 2)), resample=Image.BICUBIC))
         I = np.float32(np.reshape(I, [1, int(PATCH_WIDTH * DSLR_SCALE / FAC_SCALE), int(PATCH_HEIGHT * DSLR_SCALE / FAC_SCALE), 3])) / 255
-
-        if mix > 1:
-            for iMix in iRand:
-                Itmp = Image.open(train_directory_dslr + str(iMix) + '.' + format_dslr)
-                I += np.float32(np.reshape(Itmp, [1, int(PATCH_WIDTH * DSLR_SCALE / FAC_SCALE), int(PATCH_HEIGHT * DSLR_SCALE / FAC_SCALE), 3])) / 255
-            I /= mix
-
         train_answ[i, :] = I
 
         i += 1
 
     return train_data, train_answ
+
 
 def load_train_patch_exp(dataset_dir, dslr_dir, phone_dir, over_dir, under_dir, TRAIN_SIZE, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE):
 
