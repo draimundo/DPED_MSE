@@ -237,7 +237,7 @@ def process_command_args(arguments):
     print("Evaluation step: " + str(eval_step))
     print("Path to the dataset: " + dataset_dir)
     print("Flat + stacked input: " + str(mix_input))
-    print("One-by-one conv: " + onebyone)
+    print("One-by-one conv: " + str(onebyone))
     print("Triple exposure: " + str(triple_exposure))
     print("Up exposure: " + str(up_exposure))
     print("Down exposure: " + str(down_exposure))
@@ -430,7 +430,7 @@ def process_test_model_args(arguments):
     print("Path to the under dir: " + under_dir)
 
     print("Flat + stacked input: " + str(mix_input))
-    print("One-by-one conv: " + onebyone)
+    print("One-by-one conv: " + str(onebyone))
 
     return dataset_dir, test_dir, model_dir, result_dir,\
     dslr_dir, phone_dir, over_dir, under_dir, triple_exposure, up_exposure, down_exposure,\
