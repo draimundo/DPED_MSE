@@ -160,7 +160,7 @@ with tf.compat.v1.Session(config=config) as sess:
         logs_gen += '\n'
         print(logs_gen)
 
-        logs = open(model_dir + "test" + ".txt", "a+")
+        logs = open(model_dir + model_dir.split('/')[0] + ".txt", "a+")
         logs.write(logs_gen)
         logs.write('\n')
         logs.close()
