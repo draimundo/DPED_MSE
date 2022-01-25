@@ -7,13 +7,20 @@ import numpy as np
 from tensorflow.python.ops.gen_nn_ops import max_pool
 
 
-def dped_g(input_image, leaky = True, norm = 'instance', flat = 0):
+def dped_g(input_image, leaky = True, norm = 'instance', flat = 0, mix_input=False, onebyone=False):
     with tf.compat.v1.variable_scope("generator"):
         if flat > 0:
-            conv1 = _conv_layer(input_image, 64, flat, 2, norm = 'none', leaky = leaky)
+            if mix_input:
+                flat_in = _extract_colors(input_image)
+                flat_conv = _conv_layer(input_image, 64, flat, 2, norm = 'none', leaky = leaky)
+                conv1 = _stack(flat_in, flat_conv)
+            else:
+                conv1 = _conv_layer(input_image, 64, flat, 2, norm = 'none', leaky = leaky)
         else:
             conv1 = _conv_layer(input_image, 64, 9, 1, norm = 'none', leaky = leaky)
-        
+            if onebyone:
+                conv1 = _conv_layer(conv1, 64, 1, 1, norm = 'none', leaky = leaky)
+
         conv_b1a = _conv_layer(conv1, 64, 3, 1, norm = norm, leaky = leaky)
         conv_b1b = _conv_layer(conv_b1a, 64, 3, 1, norm = norm, leaky = leaky) + conv1
 
@@ -173,6 +180,11 @@ def weight_variable(shape, name):
     initial = tf.compat.v1.truncated_normal(shape, stddev=0.01)
     return tf.Variable(initial, name=name)
 
+def _extract_colors(input):
+    return tf.nn.space_to_depth(input, 2)
+
+def _stack(x, y):
+    return tf.concat([x, y], 3)
 
 def bias_variable(shape, name):
     initial = tf.constant(0.01, shape=shape)
@@ -190,28 +202,23 @@ def _conv_multi_block(input, max_size, num_maps, norm):
         conv_5a = _conv_layer(input, num_maps, 5, 1, relu=True, norm=norm)
         conv_5b = _conv_layer(conv_5a, num_maps, 5, 1, relu=True, norm=norm)
 
-        output_tensor = stack(output_tensor, conv_5b)
+        output_tensor = _stack(output_tensor, conv_5b)
 
     if max_size >= 7:
 
         conv_7a = _conv_layer(input, num_maps, 7, 1, relu=True, norm=norm)
         conv_7b = _conv_layer(conv_7a, num_maps, 7, 1, relu=True, norm=norm)
 
-        output_tensor = stack(output_tensor, conv_7b)
+        output_tensor = _stack(output_tensor, conv_7b)
 
     if max_size >= 9:
 
         conv_9a = _conv_layer(input, num_maps, 9, 1, relu=True, norm=norm)
         conv_9b = _conv_layer(conv_9a, num_maps, 9, 1, relu=True, norm=norm)
 
-        output_tensor = stack(output_tensor, conv_9b)
+        output_tensor = _stack(output_tensor, conv_9b)
 
     return output_tensor
-
-
-def stack(x, y):
-    return tf.concat([x, y], 3)
-
 
 def conv2d(x, W):
     return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
