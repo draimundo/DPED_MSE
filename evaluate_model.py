@@ -40,9 +40,6 @@ TARGET_HEIGHT = int(PATCH_HEIGHT * FAC_PATCH)
 TARGET_DEPTH = 3
 TARGET_SIZE = TARGET_WIDTH * TARGET_HEIGHT * TARGET_DEPTH
 
-dataset_dir = 'raw_images/'
-dslr_dir = 'fujifilm/'
-phone_dir = 'mediatek_raw/'
 vgg_dir = 'vgg_pretrained/imagenet-vgg-verydeep-19.mat'
 if restore_iter == 0:
     restore_iters = sorted(list(set([int((model_file.split("_")[-1]).split(".")[0])
