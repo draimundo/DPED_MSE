@@ -133,10 +133,10 @@ def load_val_data_exp(dataset_dir, dslr_dir, phone_dir, over_dir, under_dir, PAT
 
     return val_data, val_answ
 
-def load_test_data(dataset_dir, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, triple_exposure, over_dir, under_dir, up_exposure = False, down_exposure = False, flat = False):
+def load_test_data(dataset_dir, dslr_dir, phone_dir, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, triple_exposure, over_dir, under_dir, up_exposure = False, down_exposure = False, flat = False):
 
-    test_directory_dslr = dataset_dir + 'test/fujifilm/'
-    test_directory_phone = dataset_dir + 'test/mediatek_raw/'
+    test_directory_dslr = dataset_dir + 'test/' + dslr_dir
+    test_directory_phone = dataset_dir + 'test/' + phone_dir
 
     test_directory_over = dataset_dir + 'test/' + over_dir
     test_directory_under = dataset_dir + 'test/' + under_dir
