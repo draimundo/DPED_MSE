@@ -19,6 +19,7 @@ from load_dataset import extract_bayer_channels
 dataset_dir, test_dir, model_dir, result_dir,\
     dslr_dir, phone_dir, over_dir, under_dir, triple_exposure, up_exposure, down_exposure,\
     arch, level, norm_gen, num_maps_base, flat, orig_model, rand_param, restore_iter,\
+    leaky, mix_input, onebyone,\
     img_h, img_w, use_gpu, save_model, test_image = utils.process_test_model_args(sys.argv)
 
 DSLR_SCALE = float(1) / (2 ** (max(level,0) - 1))
@@ -65,7 +66,7 @@ with tf.compat.v1.Session(config=config) as sess:
 
 
     # generate enhanced image
-    enhanced = dped_g(x_, flat=flat, norm=norm_gen)
+    enhanced = dped_g(x_, leaky = leaky, norm = norm_gen, flat = flat, mix_input = mix_input, onebyone = onebyone)
 
 
     # Determine model weights

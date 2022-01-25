@@ -45,6 +45,9 @@ def process_command_args(arguments):
     mix = 0
     optimizer='radam'
 
+    mix_input = False
+    onebyone = False
+
     over_dir = 'mediatek_raw_over/'
     under_dir = 'mediatek_raw_under/'
     triple_exposure = False
@@ -97,6 +100,12 @@ def process_command_args(arguments):
         
         if args.startswith("num_maps_base"):
             num_maps_base = int(args.split("=")[1])
+
+        if args.startswith("mix_input"):
+            mix_input = eval(args.split("=")[1])
+
+        if args.startswith("onebyone"):
+            onebyone = eval(args.split("=")[1])
 
         # --- model weights ---
         if args.startswith("restore_iter"):
@@ -227,6 +236,8 @@ def process_command_args(arguments):
     print("Training iterations: " + str(num_train_iters))
     print("Evaluation step: " + str(eval_step))
     print("Path to the dataset: " + dataset_dir)
+    print("Flat + stacked input: " + str(mix_input))
+    print("One-by-one conv: " + onebyone)
     print("Triple exposure: " + str(triple_exposure))
     print("Up exposure: " + str(up_exposure))
     print("Down exposure: " + str(down_exposure))
@@ -255,6 +266,7 @@ def process_command_args(arguments):
         triple_exposure, up_exposure, down_exposure, over_dir, under_dir,\
         patch_w, patch_h, batch_size, train_size, learning_rate, eval_step, num_train_iters, \
         save_mid_imgs, leaky, norm_gen, norm_disc, flat, percentage, entropy, mix, optimizer,\
+        mix_input, onebyone,\
         fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips, fac_huber, fac_unet
 
 
@@ -290,10 +302,14 @@ def process_test_model_args(arguments):
     img_h = 1500 # default size
     img_w = 2000 # default size
     # --- more options ---
-    use_gpu = False
+    use_gpu = True
     save_model = False
     test_image = True
     flat = 0
+
+    mix_input = False
+    onebyone = False
+    leaky = True
 
     for args in arguments:
         
@@ -316,9 +332,14 @@ def process_test_model_args(arguments):
         if args.startswith("phone_dir"):
             phone_dir = args.split("=")[1]
 
+        if args.startswith("triple_exposure"):
+            triple_exposure = eval(args.split("=")[1])
+        if args.startswith("up_exposure"):
+            up_exposure = eval(args.split("=")[1])
+        if args.startswith("down_exposure"):
+            down_exposure = eval(args.split("=")[1])
         if args.startswith("over_dir"):
             over_dir = args.split("=")[1]
-
         if args.startswith("under_dir"):
             under_dir = args.split("=")[1]
 
@@ -366,6 +387,15 @@ def process_test_model_args(arguments):
         if args.startswith("flat"):
             flat = int(args.split("=")[1])
 
+        if args.startswith("mix_input"):
+            mix_input = eval(args.split("=")[1])
+
+        if args.startswith("onebyone"):
+            onebyone = eval(args.split("=")[1])
+
+        if args.startswith("leaky"):
+            leaky = eval(args.split("=")[1])
+
     # choose architecture
     if arch == "resnet":
         name_model = "resnet"
@@ -395,14 +425,18 @@ def process_test_model_args(arguments):
     print("Up exposure: " + str(up_exposure))
     print("Down exposure: " + str(down_exposure))
     print("Triple exposure: " + str(triple_exposure))
-    if triple_exposure:
-        print("Path to the over dir: " + over_dir)
-        print("Path to the under dir: " + under_dir)
+
+    print("Path to the over dir: " + over_dir)
+    print("Path to the under dir: " + under_dir)
+
+    print("Flat + stacked input: " + str(mix_input))
+    print("One-by-one conv: " + onebyone)
 
     return dataset_dir, test_dir, model_dir, result_dir,\
-        dslr_dir, phone_dir, over_dir, under_dir, triple_exposure, up_exposure, down_exposure,\
-        arch, level, norm_gen, num_maps_base, flat, orig_model, rand_param, restore_iter,\
-        img_h, img_w, use_gpu, save_model, test_image
+    dslr_dir, phone_dir, over_dir, under_dir, triple_exposure, up_exposure, down_exposure,\
+    arch, level, norm_gen, num_maps_base, flat, orig_model, rand_param, restore_iter,\
+    leaky, mix_input, onebyone,\
+    img_h, img_w, use_gpu, save_model, test_image
 
 
 def get_last_iter(model_dir, name_model):

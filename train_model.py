@@ -27,6 +27,7 @@ dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir, restore_iter,\
 triple_exposure, up_exposure, down_exposure, over_dir, under_dir,\
 patch_w, patch_h, batch_size, train_size, learning_rate, eval_step, num_train_iters, \
 save_mid_imgs, leaky, norm_gen, norm_disc, flat, percentage, entropy, mix, optimizer,\
+mix_input, onebyone,\
 fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips, fac_huber, fac_unet \
     = utils.process_command_args(sys.argv)
 
@@ -66,7 +67,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     dslr_ = tf.compat.v1.placeholder(tf.float32, [batch_size, TARGET_HEIGHT, TARGET_WIDTH, TARGET_DEPTH])
 
     # Get the processed enhanced image
-    enhanced = dped_g(phone_, leaky = leaky, norm = norm_gen, flat = flat)
+    enhanced = dped_g(phone_, leaky = leaky, norm = norm_gen, flat = flat, mix_input = mix_input, onebyone = onebyone)
 
     # Losses
     dslr_gray = tf.image.rgb_to_grayscale(dslr_)

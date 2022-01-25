@@ -18,6 +18,7 @@ import lpips_tf
 dataset_dir, test_dir, model_dir, result_dir,\
     dslr_dir, phone_dir, over_dir, under_dir, triple_exposure, up_exposure, down_exposure,\
     arch, level, norm_gen, num_maps_base, flat, orig_model, rand_param, restore_iter,\
+    leaky, mix_input, onebyone,\
     img_h, img_w, use_gpu, save_model, test_image = utils.process_test_model_args(sys.argv)
 
 if flat:
@@ -65,7 +66,7 @@ with tf.compat.v1.Session(config=config) as sess:
     phone_ = tf.compat.v1.placeholder(tf.float32, [batch_size, PATCH_HEIGHT, PATCH_WIDTH, PATCH_DEPTH])
     dslr_ = tf.compat.v1.placeholder(tf.float32, [batch_size, TARGET_HEIGHT, TARGET_WIDTH, TARGET_DEPTH])
 
-    enhanced = dped_g(phone_, flat=flat, norm=norm_gen)
+    enhanced = dped_g(phone_, leaky = leaky, norm = norm_gen, flat = flat, mix_input = mix_input, onebyone = onebyone)
     saver = tf.compat.v1.train.Saver()
 
     dslr_gray = tf.image.rgb_to_grayscale(dslr_)
