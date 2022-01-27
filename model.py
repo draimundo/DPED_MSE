@@ -12,10 +12,14 @@ def dped_g(input_image, leaky = True, norm = 'instance', flat = 0, mix_input=Fal
         if flat > 0:
             if mix_input:
                 flat_in = _extract_colors(input_image)
-                flat_conv = _conv_layer(input_image, 64, flat, 2, norm = 'none', leaky = leaky)
+                flat_conv = _conv_layer(input_image, 60, flat, 2, norm = 'none', leaky = leaky)
                 conv1 = _stack(flat_in, flat_conv)
+                if onebyone:
+                    conv1 = _conv_layer(conv1, 64, 1, 1, norm = 'none', leaky = leaky)
             else:
                 conv1 = _conv_layer(input_image, 64, flat, 2, norm = 'none', leaky = leaky)
+                if onebyone:
+                    conv1 = _conv_layer(conv1, 64, 1, 1, norm = 'none', leaky = leaky)
         else:
             conv1 = _conv_layer(input_image, 64, 9, 1, norm = 'none', leaky = leaky)
             if onebyone:

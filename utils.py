@@ -149,8 +149,8 @@ def process_command_args(arguments):
             percentage = int(args.split("=")[1])
         if args.startswith("entropy"):
             entropy = args.split("=")[1]
-        if args.startswith("mix"):
-            mix = int(args.split("=")[1])
+        # if args.startswith("mix"):
+        #     mix = int(args.split("=")[1])
         if args.startswith("optimizer"):
             optimizer = args.split("=")[1]
 
