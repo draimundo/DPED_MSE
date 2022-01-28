@@ -77,6 +77,12 @@ with tf.compat.v1.Session(config=config) as sess:
     loss_list = [loss_psnr]
     loss_text = ["loss_psnr"]
 
+    ## Old PSNR loss
+    old_mse = tf.reduce_sum(tf.pow(dslr_ - enhanced, 2))  / (TARGET_SIZE * batch_size)
+    old_psnr = 20 * utils.log10(1.0 / tf.sqrt(old_mse))
+    loss_list.append(old_psnr)
+    loss_text.append("old_psnr")
+
     # MSE loss
     loss_mse = tf.reduce_mean(tf.math.squared_difference(enhanced, dslr_))
     loss_list.append(loss_mse)
