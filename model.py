@@ -7,7 +7,7 @@ import numpy as np
 from tensorflow.python.ops.gen_nn_ops import max_pool
 
 
-def dped_g(input_image, leaky = True, norm = 'instance', flat = 0, mix_input=False, onebyone=False):
+def dped_g(input_image, leaky = True, norm = 'instance', flat = 0, mix_input=False, onebyone=False, upscale='transpose'):
     with tf.compat.v1.variable_scope("generator"):
         if flat > 0:
             if mix_input:
@@ -39,10 +39,62 @@ def dped_g(input_image, leaky = True, norm = 'instance', flat = 0, mix_input=Fal
 
         conv2 = _conv_layer(conv_b4b, 64, 3, 1, norm = 'none', leaky = leaky)
         conv3 = _conv_layer(conv2, 64, 3, 1, norm = 'none', leaky = leaky)
-        tconv1 = _conv_tranpose_layer(conv3, 64, 3, 2, leaky = leaky)
+        tconv1 = _upscale(conv3, 64, 3, 2, upscale)
         enhanced = tf.nn.tanh(_conv_layer(tconv1, 3, 9, 1, relu = False, norm = 'none')) * 0.58 + 0.5
 
     return enhanced
+
+
+def resnext_g(input_image, leaky = True, norm = 'instance', flat = 0, mix_input=False, onebyone=False, upscale='resnet'):
+    with tf.compat.v1.variable_scope("generator"):
+        conv1 = _conv_layer(input_image, 64, 4, 2, norm = 'none', leaky = leaky)
+        conv1 = _conv_layer(conv1, 64, 1, 1, norm = 'none', leaky = leaky)
+
+        conv_b1 = _convnext(conv1)
+
+        conv_b2 = _convnext(conv_b1)
+
+        conv_b3 = _convnext(conv_b2)
+
+        conv_b4 = _convnext(conv_b3)
+
+        conv2 = _conv_layer(conv_b4, 64, 3, 1, norm = 'none', leaky = leaky)
+        conv3 = _conv_layer(conv2, 64, 3, 1, norm = 'none', leaky = leaky)
+        tconv1 = _upscale(conv3, 64, 3, 2, upscale)
+        enhanced = tf.nn.tanh(_conv_layer(tconv1, 3, 9, 1, relu = False, norm = 'none')) * 0.58 + 0.5
+
+    return enhanced
+
+
+def _convnext(input):
+    _, rows, cols, in_channels = [i for i in input.get_shape()]
+
+    net = _depth_conv_layer(input, 1, 3 ,1)
+    net = _group_norm(net, G=1) # layer norm
+    net = _conv_layer(net, in_channels*3, 1, 1, relu=False)
+    net = _gelu(net)
+    net = _conv_layer(net, in_channels, 1, 1, relu=False)
+
+    return net + input
+
+
+def _gelu(x):
+    return 0.5 * x * (1 + tf.tanh(tf.sqrt(2 / np.pi) * (x + 0.044715 * tf.pow(x, 3))))
+
+def _upscale(net, num_filters, filter_size, factor, method):
+    if method == "transpose":
+        return _conv_tranpose_layer(net, num_filters, filter_size, factor)
+    elif method == "shuffle":
+        return _conv_pixel_shuffle_up(net, num_filters, filter_size, factor)
+    elif method == "dcl":
+        return _pixel_dcl(net, num_filters, filter_size)
+    elif method == "resnet":
+        return _resblock_up(net, num_filters, sn=True)
+    elif method == "nn":
+        return _nearest_neighbor(net, factor)
+    else:
+        print("Unrecognized upscaling method")
+
 
 def texture_d(image_, activation=True):
 
@@ -228,6 +280,14 @@ def conv2d(x, W):
     return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
 
 
+def _depth_conv_layer(net, multiplier, filter_size, strides, padding='SAME'):
+    _, rows, cols, in_channels = [i for i in net.get_shape()]
+
+    weights_init = _conv_init_vars(net, in_channels*multiplier, filter_size)
+    strides_shape = [1, strides, strides, 1]
+
+    return tf.nn.depthwise_conv2d(net, weights_init, strides_shape, padding=padding)
+
 def _conv_layer(net, num_filters, filter_size, strides, relu=True, norm='none', padding='SAME', leaky = True, use_bias=True, sn=False):
 
     weights_init = _conv_init_vars(net, num_filters, filter_size)
@@ -252,6 +312,52 @@ def _conv_layer(net, num_filters, filter_size, strides, relu=True, norm='none', 
 
     return net
 
+def _conv_pixel_shuffle_up(net, num_filters, filter_size, factor):
+    weights_init = _conv_init_vars(net, num_filters*factor*2, filter_size)
+
+    strides_shape = [1, 1, 1, 1]
+    net = tf.nn.conv2d(net, weights_init, strides_shape, padding='SAME')
+
+    net = tf.nn.depth_to_space(net, factor)
+
+    return tf.compat.v1.nn.leaky_relu(net)
+
+
+def _pixel_dcl(net, num_filters, filter_size, d_format='NHWC'):
+    axis = (d_format.index('H'), d_format.index('W'))
+
+    conv_0 = _conv_layer(net, num_filters, filter_size, 1, relu=False)
+    conv_1 = _conv_layer(conv_0, num_filters, filter_size, 1, relu=False)
+
+    dil_conv_0 = _dilate(conv_0, axis, (0,0))
+    dil_conv_1 = _dilate(conv_1, axis, (1,1))
+
+    conv_a = tf.add(dil_conv_0, dil_conv_1)
+
+    weights = _conv_init_vars(conv_a, num_filters, filter_size)
+    weights = tf.multiply(weights, _get_mask([filter_size, filter_size, num_filters, num_filters]))
+    conv_b =  tf.nn.conv2d(conv_a, weights, strides=[1,1,1,1], padding='SAME')
+
+    out = tf.add(conv_a, conv_b)
+
+    return tf.compat.v1.nn.leaky_relu(out)
+
+def _dilate(net, axes, shifts):
+    for index, axis in enumerate(axes):
+        elements = tf.unstack(net, axis=axis)
+        zeros = tf.zeros_like(elements[0])
+        for element_index in range(len(elements), 0, -1):
+            elements.insert(element_index-shifts[index], zeros)
+        net = tf.stack(elements, axis=axis)
+    return net
+
+def _get_mask(shape):
+    new_shape = (np.prod(shape[:-2]), shape[-2], shape[-1])
+    mask = np.ones(new_shape, dtype=np.float32)
+    for i in range(0, new_shape[0], 2):
+        mask[i, :, :] = 0
+    mask = np.reshape(mask, shape, 'F')
+    return tf.constant(mask, dtype=tf.float32)
 
 def _switch_norm(net, norm):
     if norm == 'instance':
@@ -278,7 +384,7 @@ def _instance_norm(net):
     return scale * normalized + shift
 
 def _group_norm(x, G=32, eps=1e-5) :
-    N, H, W, C = x.get_shape().as_list()
+    N, H, W, C = [i for i in x.get_shape()]
     G = min(G, C)
 
     x = tf.reshape(x, [N, H, W, G, C // G])

@@ -47,6 +47,8 @@ def process_command_args(arguments):
 
     mix_input = False
     onebyone = False
+    model_type = 'dped'
+    upscale = 'transpose'
 
     over_dir = 'mediatek_raw_over/'
     under_dir = 'mediatek_raw_under/'
@@ -54,7 +56,7 @@ def process_command_args(arguments):
     up_exposure = False
     down_exposure = False
 
-    default_facs = False
+    default_facs = True
     fac_mse = 0
     fac_l1 = 0
     fac_ssim = 0
@@ -106,6 +108,12 @@ def process_command_args(arguments):
 
         if args.startswith("onebyone"):
             onebyone = eval(args.split("=")[1])
+
+        if args.startswith("model_type"):
+            model_type = args.split("=")[1]
+
+        if args.startswith("upscale"):
+            upscale = args.split("=")[1]
 
         # --- model weights ---
         if args.startswith("restore_iter"):
@@ -222,6 +230,8 @@ def process_command_args(arguments):
     num_train_iters += restore_iter
 
     print("The following parameters will be applied for training:")
+    print("Model type: " + model_type)
+    print("Upscale: " + upscale)
     print("Restore Iteration: " + str(restore_iter))
     print("Flat: " + str(flat))
     print("Generator norm: " + norm_gen)
@@ -266,7 +276,7 @@ def process_command_args(arguments):
         triple_exposure, up_exposure, down_exposure, over_dir, under_dir,\
         patch_w, patch_h, batch_size, train_size, learning_rate, eval_step, num_train_iters, \
         save_mid_imgs, leaky, norm_gen, norm_disc, flat, percentage, entropy, mix, optimizer,\
-        mix_input, onebyone,\
+        mix_input, onebyone, model_type, upscale,\
         fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips, fac_huber, fac_unet
 
 
@@ -310,6 +320,8 @@ def process_test_model_args(arguments):
     mix_input = False
     onebyone = False
     leaky = True
+    model_type = 'dped'
+    upscale = 'transpose'
 
     for args in arguments:
         
@@ -396,6 +408,12 @@ def process_test_model_args(arguments):
         if args.startswith("leaky"):
             leaky = eval(args.split("=")[1])
 
+        if args.startswith("model_type"):
+            model_type = args.split("=")[1]
+
+        if args.startswith("upscale"):
+            upscale = args.split("=")[1]
+
     # choose architecture
     if arch == "resnet":
         name_model = "resnet"
@@ -412,7 +430,8 @@ def process_test_model_args(arguments):
             sys.exit()
 
     print("The following parameters will be applied for testing:")
-
+    print("Model type: " + model_type)
+    print("Upscale: " + upscale)
     print("Model architecture: " + arch)
     print("Flat: " + str(flat))
     print("Restore Iteration: " + str(restore_iter))
@@ -435,7 +454,7 @@ def process_test_model_args(arguments):
     return dataset_dir, test_dir, model_dir, result_dir,\
     dslr_dir, phone_dir, over_dir, under_dir, triple_exposure, up_exposure, down_exposure,\
     arch, level, norm_gen, num_maps_base, flat, orig_model, rand_param, restore_iter,\
-    leaky, mix_input, onebyone,\
+    leaky, mix_input, onebyone, model_type, upscale,\
     img_h, img_w, use_gpu, save_model, test_image
 
 
