@@ -74,7 +74,7 @@ def _convnext(input):
     _, rows, cols, in_channels = [i for i in input.get_shape()]
 
     net = _depth_conv_layer(input, 1, 3 ,1)
-    net = _group_norm(net, G=1) # layer norm
+    net = _instance_norm(net) # layer norm
     net = _conv_layer(net, in_channels*3, 1, 1, relu=False)
     net = _gelu(net)
     net = _conv_layer(net, in_channels, 1, 1, relu=False)
