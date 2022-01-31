@@ -52,13 +52,11 @@ def resnext_g(input_image, leaky = True, norm = 'instance', flat = 0, mix_input=
         conv1 = _conv_layer(input_image, 64, 4, 2, norm = 'none', leaky = leaky)
         conv1 = _conv_layer(conv1, 64, 1, 1, norm = 'none', leaky = leaky)
 
-        conv_b1a = _conv_layer(conv1, 64, 3, 1, norm = norm, leaky = leaky)
-        conv_b1b = _conv_layer(conv_b1a, 64, 3, 1, norm = norm, leaky = leaky) + conv1
+        conv_b1 = _convnext(conv1)
 
-        conv_b2a = _conv_layer(conv_b1b, 64, 3, 1, norm = norm, leaky = leaky)
-        conv_b2b = _conv_layer(conv_b2a, 64, 3, 1, norm = norm, leaky = leaky) + conv_b1b
+        conv_b2 = _convnext(conv_b1)
 
-        conv_b3 = _convnext(conv_b2b)
+        conv_b3 = _convnext(conv_b2)
 
         conv_b4 = _convnext(conv_b3)
 
@@ -287,10 +285,11 @@ def conv2d(x, W):
 def _depth_conv_layer(net, multiplier, filter_size, strides, padding='SAME'):
     _, rows, cols, in_channels = [i for i in net.get_shape()]
 
-    weights_init = _conv_init_vars(net, in_channels*multiplier, filter_size)
+    weights_init = _conv_init_vars(net, multiplier, filter_size)
     strides_shape = [1, strides, strides, 1]
 
-    return tf.nn.depthwise_conv2d(net, weights_init, strides_shape, padding=padding)
+    net = tf.nn.depthwise_conv2d(net, weights_init, strides_shape, padding=padding)
+    return net
 
 def _conv_layer(net, num_filters, filter_size, strides, relu=True, norm='none', padding='SAME', leaky = True, use_bias=True, sn=False):
 
