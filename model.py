@@ -33,9 +33,11 @@ def dped_g(input_image, leaky = True, norm = 'instance', flat = 0, mix_input=Fal
 
         conv_b3a = _conv_layer(conv_b2b, 64, 3, 1, norm = norm, leaky = leaky)
         conv_b3b = _conv_layer(conv_b3a, 64, 3, 1, norm = norm, leaky = leaky) + conv_b2b
+        
 
         conv_b4a = _conv_layer(conv_b3b, 64, 3, 1, norm = norm, leaky = leaky)
         conv_b4b = _conv_layer(conv_b4a, 64, 3, 1, norm = norm, leaky = leaky) + conv_b3b
+
 
         conv2 = _conv_layer(conv_b4b, 64, 3, 1, norm = 'none', leaky = leaky)
         conv3 = _conv_layer(conv2, 64, 3, 1, norm = 'none', leaky = leaky)
@@ -50,11 +52,13 @@ def resnext_g(input_image, leaky = True, norm = 'instance', flat = 0, mix_input=
         conv1 = _conv_layer(input_image, 64, 4, 2, norm = 'none', leaky = leaky)
         conv1 = _conv_layer(conv1, 64, 1, 1, norm = 'none', leaky = leaky)
 
-        conv_b1 = _convnext(conv1)
+        conv_b1a = _conv_layer(conv1, 64, 3, 1, norm = norm, leaky = leaky)
+        conv_b1b = _conv_layer(conv_b1a, 64, 3, 1, norm = norm, leaky = leaky) + conv1
 
-        conv_b2 = _convnext(conv_b1)
+        conv_b2a = _conv_layer(conv_b1b, 64, 3, 1, norm = norm, leaky = leaky)
+        conv_b2b = _conv_layer(conv_b2a, 64, 3, 1, norm = norm, leaky = leaky) + conv_b1b
 
-        conv_b3 = _convnext(conv_b2)
+        conv_b3 = _convnext(conv_b2b)
 
         conv_b4 = _convnext(conv_b3)
 
