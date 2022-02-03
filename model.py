@@ -2,9 +2,9 @@
 # RAW-to-RGB Model architecture #
 #################################
 
+import matplotlib.pyplot as plt
 import tensorflow as tf
 import numpy as np
-from tensorflow.python.ops.gen_nn_ops import max_pool
 
 
 def dped_g(input_image, leaky = True, norm = 'instance', flat = 0, mix_input=False, onebyone=False, upscale='transpose'):
@@ -46,8 +46,7 @@ def dped_g(input_image, leaky = True, norm = 'instance', flat = 0, mix_input=Fal
 
     return enhanced
 
-
-def resnext_g(input_image, leaky = True, norm = 'instance', flat = 0, mix_input=False, onebyone=False, upscale='resnet'):
+def resnext_g(input_image, leaky = True, norm = 'instance', flat = 0, mix_input=False, onebyone=False, upscale='transpose'):
     with tf.compat.v1.variable_scope("generator"):
         conv1 = _conv_layer(input_image, 64, 4, 2, norm = 'none', leaky = leaky)
         conv1 = _conv_layer(conv1, 64, 1, 1, norm = 'none', leaky = leaky)
@@ -64,9 +63,30 @@ def resnext_g(input_image, leaky = True, norm = 'instance', flat = 0, mix_input=
         conv3 = _conv_layer(conv2, 64, 3, 1, norm = 'none', leaky = leaky)
         tconv1 = _upscale(conv3, 64, 3, 2, upscale)
         enhanced = tf.nn.tanh(_conv_layer(tconv1, 3, 9, 1, relu = False, norm = 'none')) * 0.58 + 0.5
-
     return enhanced
 
+def swinir_g(input_image, leaky = True, norm = 'instance', flat = 0, mix_input=False, onebyone=False, upscale='resnet'):
+    with tf.compat.v1.variable_scope("generator"):
+        conv1 = _conv_layer(input_image, 64, 4, 2, norm = 'none', leaky = leaky)
+        conv1 = _conv_layer(conv1, 64, 1, 1, norm = 'none', leaky = leaky)
+
+        conv_b1a = _conv_layer(conv1, 64, 3, 1, norm = norm, leaky = leaky)
+        conv_b1b = _conv_layer(conv_b1a, 64, 3, 1, norm = norm, leaky = leaky) + conv1
+
+        # conv_b2a = _conv_layer(conv_b1b, 64, 3, 1, norm = norm, leaky = leaky)
+        # conv_b2b = _conv_layer(conv_b2a, 64, 3, 1, norm = norm, leaky = leaky) + conv_b1b
+
+        conv_b3 = _forward_features(conv_b1b, dim=128, depth=4, num_heads=4, window_size=8, mlp_ratio=2, qkv_bias=True, qk_scale=False, patch_size=1, num_rstb=3)
+        
+        conv_b4a = _conv_layer(conv_b3, 64, 3, 1, norm = norm, leaky = leaky)
+        conv_b4b = _conv_layer(conv_b4a, 64, 3, 1, norm = norm, leaky = leaky) + conv_b3
+
+        conv2 = _conv_layer(conv_b4b, 64, 3, 1, norm = 'none', leaky = leaky)
+        conv3 = _conv_layer(conv2, 64, 3, 1, norm = 'none', leaky = leaky)
+        tconv1 = _upscale(conv3, 64, 3, 2, upscale)
+        enhanced = tf.nn.tanh(_conv_layer(tconv1, 3, 9, 1, relu = False, norm = 'none')) * 0.58 + 0.5
+
+    return enhanced
 
 def _convnext(input):
     _, rows, cols, in_channels = [i for i in input.get_shape()]
@@ -78,7 +98,6 @@ def _convnext(input):
     net = _conv_layer(net, in_channels, 1, 1, relu=False)
 
     return net + input
-
 
 def _gelu(x):
     return 0.5 * x * (1 + tf.tanh(tf.sqrt(2 / np.pi) * (x + 0.044715 * tf.pow(x, 3))))
@@ -367,6 +386,8 @@ def _switch_norm(net, norm):
         return _instance_norm(net)
     elif norm == 'group':
         return _group_norm(net)
+    elif norm == 'layer':
+        return _layer_norm(net)
     elif norm == 'none':
         return net
     else:
@@ -401,15 +422,40 @@ def _group_norm(x, G=32, eps=1e-5) :
 
     return x
 
+def _layer_norm(net):
+    if len(net.get_shape()) == 4:
+        batch, rows, cols, channels = [i for i in net.get_shape()]
+        axes = [1,2,3]
+        perm = [3,1,2,0]
+    elif len(net.get_shape()) == 3:
+        batch, vals, channels = [i for i in net.get_shape()]
+        axes = [1,2]
+        perm = [2,1,0]
+    var_shape = [batch]
 
-def _fully_connected_layer(net, num_weights, relu=True):
-    batch, channels = [i for i in net.get_shape()]
+    mu, sigma_sq = tf.compat.v1.nn.moments(net, axes, keepdims=True)
+    shift = tf.Variable(tf.zeros(var_shape))
+    scale = tf.Variable(tf.ones(var_shape))
+
+    epsilon = 1e-3
+    normalized = (net-mu)/(sigma_sq + epsilon)**(.5)
+
+    ret = scale*tf.transpose(normalized, perm=perm) + shift
+    ret = tf.transpose(ret, perm=perm)
+
+    return ret
+
+
+def _fully_connected_layer(net, num_weights, bias = True, relu=True):
+    channels = net.get_shape().as_list()[-1]
     weights_shape = [channels, num_weights]
 
     weights = tf.Variable(tf.random.truncated_normal(weights_shape, stddev=0.01, seed=1), dtype=tf.float32)
-    bias = tf.Variable(tf.constant(0.01, shape=[num_weights]))
+    out = tf.matmul(net, weights)
 
-    out = tf.matmul(net, weights) + bias
+    if bias:
+        bias = tf.Variable(tf.constant(0.01, shape=[num_weights]))
+        out = out + bias
 
     if relu:
         out = tf.compat.v1.nn.leaky_relu(out)
@@ -493,3 +539,225 @@ def _spectral_norm(w, iteration=1):
         w_norm = tf.reshape(w_norm, w_shape)
 
     return w_norm
+
+
+def _patch_embed(net, patch_size, embed_dim, norm_layer):
+    B, H, W, C = net.get_shape().as_list()
+    if norm_layer:
+        net = _layer_norm(net)
+    net = tf.reshape(net, [-1, (H//patch_size) * (W//patch_size), embed_dim])
+    return net
+
+def _patch_unembed(net, img_size, img_ch):
+    B, HW, C = net.get_shape().as_list()
+    net = tf.reshape(net, [-1, img_size[0], img_size[1], img_ch])
+    return net
+
+def _window_partition(x, window_size):
+    B, H, W, C = x.get_shape().as_list()
+    x = tf.reshape(x, shape=[-1, H // window_size, window_size, W // window_size, window_size, C])
+    x = tf.transpose(x, perm=[0, 1, 3, 2, 4, 5])
+    windows = tf.reshape(x, shape=[-1, window_size, window_size, C])
+    return windows
+
+def _window_reverse(windows, window_size, H, W):
+    B = int(windows.shape[0] / (H * W / window_size / window_size))
+    x = tf.reshape(windows, [B, H // window_size, W // window_size, window_size, window_size, -1])
+    x = tf.reshape(tf.transpose(x, perm=[0, 1, 3, 2, 4, 5]), [B, H, W, -1])
+    return x
+
+def _window_attention(net, window_size, num_heads, qkv_bias, qk_scale, mask=None):
+    B, N, C = [i for i in net.get_shape()]
+    head_dim = C // num_heads
+    scale = qk_scale or head_dim ** 0.5
+
+    weights_qkv = tf.Variable(tf.random.truncated_normal([C, C*3], stddev=0.02, seed=1), dtype=tf.float32)
+    qkv = tf.matmul(net, weights_qkv)
+    if qkv_bias:
+        bias_qkv = tf.Variable(tf.constant(0.01, shape=[C*3]))
+        qkv = qkv + bias_qkv
+    qkv_reshape = tf.reshape(qkv, [B, N, 3, num_heads, C//num_heads])
+    qkv_reshape = tf.transpose(qkv_reshape, perm=[2,0,3,1,4])
+    q, k, v = tf.unstack(qkv_reshape)
+    q = q*scale
+    attn = (q @ tf.transpose(k, perm=[0, 1, 3, 2]))
+
+    relative_position_bias_table = tf.Variable(tf.random.truncated_normal([(2*window_size -1) * (2*window_size -1), num_heads], stddev=0.02, seed=1), dtype=tf.float32)
+    coords_h = tf.range(window_size)
+    coords_w = tf.range(window_size)
+    coords = tf.stack(tf.meshgrid(coords_h, coords_w))  # 2, Wh, Ww
+    coords_flatten = tf.reshape(coords, [2, -1])  # 2, Wh*Ww
+    relative_coords = coords_flatten[:, :, None] - coords_flatten[:, None, :]  # 2, Wh*Ww, Wh*Ww
+    relative_coords = tf.transpose(relative_coords, perm=[1,2,0]) # Wh*Ww, Wh*Ww, 2
+    relative_coords = relative_coords + [window_size - 1, window_size - 1]  # shift to start from 0
+    relative_coords = relative_coords * [2*window_size - 1, 1]
+    relative_position_index = tf.math.reduce_sum(relative_coords,-1)  # Wh*Ww, Wh*Ww
+
+    relative_position_bias = tf.reshape(tf.gather(relative_position_bias_table, tf.reshape(relative_position_index, [-1])), [window_size * window_size, window_size * window_size, -1])  # Wh*Ww,Wh*Ww,nH
+    relative_position_bias = tf.transpose(relative_position_bias, perm=[2, 0, 1])  # nH, Wh*Ww, Wh*Ww
+    attn = attn + tf.expand_dims(relative_position_bias, axis=0)
+
+    if mask is not None:
+        nW = mask.get_shape()[0]  # tf.shape(mask)[0]
+        attn = tf.reshape(attn, shape=[-1, nW, num_heads, N, N]) + tf.cast(
+                tf.expand_dims(tf.expand_dims(mask, axis=1), axis=0), attn.dtype)
+        attn = tf.reshape(attn, shape=[-1, num_heads, N, N])
+        attn = tf.nn.softmax(attn, axis=-1)
+    else:
+        attn = tf.nn.softmax(attn, axis=-1)
+
+    x = tf.reshape(tf.transpose(attn @ v, perm=[0, 2, 1, 3]), [B, N, C])
+
+    weights_proj = tf.Variable(tf.random.truncated_normal([C, C], stddev=0.02, seed=1), dtype=tf.float32)
+    proj = tf.matmul(x, weights_proj)
+    bias_proj = tf.Variable(tf.constant(0.01, shape=[C]))
+    proj = proj + bias_proj
+
+    return x
+
+def _forward_features(input, dim, depth, num_heads, window_size, mlp_ratio, qkv_bias, qk_scale, patch_size, num_rstb):
+    B, H, W, C = input.get_shape().as_list()
+    x_size = (H, W)
+    input_resolution = x_size
+
+    net = _patch_embed(input, patch_size, dim, True)
+    
+    for i in range(num_rstb):
+        net = _rstb(net, dim, depth, num_heads, window_size, mlp_ratio, qkv_bias, qk_scale, patch_size, C, x_size)
+    net = _layer_norm(net)
+    net = _patch_unembed(net, x_size, C)
+    return net
+
+def _rstb(input, dim, depth, num_heads, window_size, mlp_ratio, qkv_bias, qk_scale, patch_size, img_ch, x_size):
+    print(input.get_shape())
+    net = _swin_transformer_layer(input, dim, depth, num_heads, window_size, mlp_ratio, qkv_bias, qk_scale, x_size)
+    print(net.get_shape())
+    net = _patch_unembed(net, x_size, img_ch)
+    print(net.get_shape())
+    net = _conv_layer(net, dim//2, 3, 1, relu=False)
+    print(net.get_shape())
+    net = _patch_embed(net, patch_size, dim, False) + input
+    return net
+
+def _swin_transformer_layer(net, dim, depth, num_heads, window_size, mlp_ratio, qkv_bias, qk_scale, x_size):
+    B, HW, C = net.get_shape().as_list()
+    for i in range(depth):
+        net = _swin_transformer_block(net, dim, num_heads, window_size,
+                                      shift_size=0 if (i % 2 == 0) else window_size // 2,
+                                      mlp_ratio=mlp_ratio, qkv_bias=qkv_bias, qk_scale=qk_scale, x_size=x_size)
+    return net
+
+def _swin_transformer_block(x, dim, num_heads, window_size, shift_size, mlp_ratio, qkv_bias, qk_scale, x_size):
+    B, L, C = x.get_shape().as_list()
+    H, W = x_size
+
+    shortcut = x
+    x = _layer_norm(x)
+    x = tf.reshape(x, shape=[-1, H, W, C])
+
+    if shift_size > 0:
+        shifted_x = tf.roll(x, shift=[-shift_size, -shift_size], axis=[1, 2])
+    else:
+        shifted_x = x
+
+    x_windows = _window_partition(shifted_x, window_size)
+    x_windows = tf.reshape(x_windows, shape=[-1, window_size * window_size, C])
+
+    if shift_size > 0:
+        attn_mask = _attention_mask(x_size, window_size, shift_size)
+    else:
+        attn_mask = None
+    attn_windows = _window_attention(x_windows, window_size, num_heads, qkv_bias, qk_scale, attn_mask)
+
+    attn_windows = tf.reshape(attn_windows, [-1, window_size, window_size, C])
+    shifted_x = _window_reverse(attn_windows, window_size, H, W)  # B H' W' C
+
+    if shift_size > 0:
+        x = tf.roll(shifted_x, shift=[shift_size, shift_size], axis=(1, 2))
+    else:
+        x = shifted_x
+    x = tf.reshape(x, [B, H * W, C])
+
+    x = shortcut + x #todo add drop_path
+    x = x + _mlp(_layer_norm(x), hidden_features=dim*mlp_ratio)
+    return x
+
+def _attention_mask(input_resolution, window_size, shift_size):
+    H, W = input_resolution
+    img_mask = np.zeros([1, H, W, 1])  # 1 H W 1
+    h_slices = (slice(0, -window_size),
+                slice(-window_size, -shift_size),
+                slice(-shift_size, None))
+    w_slices = (slice(0, -window_size),
+                slice(-window_size, -shift_size),
+                slice(-shift_size, None))
+    cnt = 0
+    for h in h_slices:
+        for w in w_slices:
+            img_mask[:, h, w, :] = cnt
+            cnt += 1
+
+    img_mask = tf.constant(img_mask)
+    mask_windows = _window_partition(img_mask, window_size)  # nW, window_size, window_size, 1
+    mask_windows = tf.reshape(mask_windows, [-1, window_size * window_size])
+    attn_mask = mask_windows[:, None, :] - mask_windows[:, :, None]
+    attn_mask = tf.where(tf.abs(attn_mask)<0.5, tf.zeros_like(attn_mask), tf.ones_like(attn_mask)*-100.)
+    return attn_mask
+
+def _mlp(net, hidden_features, out_features=None):
+    B, L, C = net.get_shape().as_list()
+    
+    out_features = out_features or C
+    hidden_features = hidden_features or C
+
+    net = _fully_connected_layer(net, hidden_features, bias=True, relu=False)
+    net = _gelu(net)
+    #todo drop?
+    net = _fully_connected_layer(net, out_features, bias=True, relu=False)
+    #todo drop?
+    return net
+
+
+def window_partition(x, window_size):
+    B, H, W, C = x.shape
+    x = np.reshape(x, [-1, H // window_size, window_size, W // window_size, window_size, C])
+    x = np.transpose(x, axes=[0, 1, 3, 2, 4, 5])
+    windows = np.reshape(x, [-1, window_size, window_size, C])
+    return windows
+
+if __name__ == "__main__":
+    window_size = 8
+    shift_size = 4
+    input_resolution = (16, 16)
+    # img_mask = np.zeros((1, H, W, 1))  # 1 H W 1
+    # h_slices = (slice(0, -window_size),
+    #             slice(-window_size, -shift_size),
+    #             slice(-shift_size, None))
+    # w_slices = (slice(0, -window_size),
+    #             slice(-window_size, -shift_size),
+    #             slice(-shift_size, None))
+    # cnt = 0
+    # for h in h_slices:
+    #     for w in w_slices:
+    #         img_mask[:, h, w, :] = cnt
+    #         cnt += 1
+
+    # mask_windows = window_partition(img_mask, window_size)  # nW, window_size, window_size, 1
+    # mask_windows = np.reshape(mask_windows,[-1, window_size * window_size])
+
+    # attn_mask = mask_windows[:, None, :] - mask_windows[:, :, None]
+    # attn_mask = np.where(attn_mask==0, 0., -100.)
+
+    with tf.compat.v1.Session() as sess:
+        attn_mask = sess.run(_attention_mask(input_resolution, window_size, shift_size))
+
+
+    # plt.matshow(img_mask[0, :, :, 0])
+    plt.matshow(attn_mask[0])
+    plt.matshow(attn_mask[1])
+    plt.matshow(attn_mask[2])
+    plt.matshow(attn_mask[3])
+
+    plt.show()
+
+

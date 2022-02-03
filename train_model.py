@@ -9,7 +9,7 @@ import sys
 from datetime import datetime
 
 from load_dataset import load_train_patch, load_val_data
-from model import dped_g, resnext_g, fourier_d, texture_d, unet_d
+from model import dped_g, resnext_g, fourier_d, swinir_g, texture_d, unet_d
 import utils
 import vgg
 import lpips_tf
@@ -71,9 +71,12 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
         enhanced = resnext_g(phone_, leaky = leaky, norm = norm_gen, flat = flat, mix_input = mix_input, onebyone = onebyone, upscale = upscale)
     elif model_type == 'dped':
         enhanced = dped_g(phone_, leaky = leaky, norm = norm_gen, flat = flat, mix_input = mix_input, onebyone = onebyone, upscale = upscale)
+    elif model_type == 'swinir':
+        enhanced = swinir_g(phone_, leaky = leaky, norm = norm_gen, flat = flat, mix_input = mix_input, onebyone = onebyone, upscale = upscale)
     else:
         raise NotImplementedError("Missing model " + model_type)
 
+    print("Num variables:" + str(np.sum([np.prod(v.get_shape().as_list()) for v in tf.compat.v1.trainable_variables()])))
     # Losses
     dslr_gray = tf.image.rgb_to_grayscale(dslr_)
     enhanced_gray = tf.image.rgb_to_grayscale(enhanced)

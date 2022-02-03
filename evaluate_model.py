@@ -6,7 +6,7 @@ from tensorflow.python.ops.gen_math_ops import square
 from tqdm import tqdm
 
 from load_dataset import load_test_data
-from model import dped_g, resnext_g
+from model import dped_g, resnext_g, swinir_g
 import utils
 import vgg
 import os
@@ -71,6 +71,8 @@ with tf.compat.v1.Session(config=config) as sess:
         enhanced = resnext_g(phone_, leaky = leaky, norm = norm_gen, flat = flat, mix_input = mix_input, onebyone = onebyone, upscale = upscale)
     elif model_type == 'dped':
         enhanced = dped_g(phone_, leaky = leaky, norm = norm_gen, flat = flat, mix_input = mix_input, onebyone = onebyone, upscale = upscale)
+    elif model_type == 'swinir':
+        enhanced = swinir_g(phone_, leaky = leaky, norm = norm_gen, flat = flat, mix_input = mix_input, onebyone = onebyone, upscale = upscale)
     else:
         raise NotImplementedError("Missing model " + model_type)
 

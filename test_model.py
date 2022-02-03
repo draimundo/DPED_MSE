@@ -9,7 +9,7 @@ import sys
 import os
 import rawpy
 
-from model import dped_g, resnext_g
+from model import dped_g, resnext_g, swinir_g
 import utils
 
 from tqdm import tqdm
@@ -71,6 +71,8 @@ with tf.compat.v1.Session(config=config) as sess:
         enhanced = resnext_g(x_, leaky = leaky, norm = norm_gen, flat = flat, mix_input = mix_input, onebyone = onebyone, upscale = upscale)
     elif model_type == 'dped':
         enhanced = dped_g(x_, leaky = leaky, norm = norm_gen, flat = flat, mix_input = mix_input, onebyone = onebyone, upscale = upscale)
+    elif model_type == 'swinir':
+        enhanced = swinir_g(x_, leaky = leaky, norm = norm_gen, flat = flat, mix_input = mix_input, onebyone = onebyone, upscale = upscale)
     else:
         raise NotImplementedError("Missing model " + model_type)
 
