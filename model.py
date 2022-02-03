@@ -70,18 +70,18 @@ def swinir_g(input_image, leaky = True, norm = 'instance', flat = 0, mix_input=F
         conv1 = _conv_layer(input_image, 64, 4, 2, norm = 'none', leaky = leaky)
         conv1 = _conv_layer(conv1, 64, 1, 1, norm = 'none', leaky = leaky)
 
-        conv_b1a = _conv_layer(conv1, 64, 3, 1, norm = norm, leaky = leaky)
-        conv_b1b = _conv_layer(conv_b1a, 64, 3, 1, norm = norm, leaky = leaky) + conv1
+        # conv_b1a = _conv_layer(conv1, 64, 3, 1, norm = norm, leaky = leaky)
+        # conv_b1b = _conv_layer(conv_b1a, 64, 3, 1, norm = norm, leaky = leaky) + conv1
 
         # conv_b2a = _conv_layer(conv_b1b, 64, 3, 1, norm = norm, leaky = leaky)
         # conv_b2b = _conv_layer(conv_b2a, 64, 3, 1, norm = norm, leaky = leaky) + conv_b1b
 
-        conv_b3 = _forward_features(conv_b1b, dim=128, depth=4, num_heads=4, window_size=8, mlp_ratio=2, qkv_bias=True, qk_scale=False, patch_size=1, num_rstb=3)
+        conv_b3 = _forward_features(conv_1, dim=64, depth=4, num_heads=4, window_size=8, mlp_ratio=2, qkv_bias=True, qk_scale=False, patch_size=1, num_rstb=3)
         
-        conv_b4a = _conv_layer(conv_b3, 64, 3, 1, norm = norm, leaky = leaky)
-        conv_b4b = _conv_layer(conv_b4a, 64, 3, 1, norm = norm, leaky = leaky) + conv_b3
+        # conv_b4a = _conv_layer(conv_b3, 64, 3, 1, norm = norm, leaky = leaky)
+        # conv_b4b = _conv_layer(conv_b4a, 64, 3, 1, norm = norm, leaky = leaky) + conv_b3
 
-        conv2 = _conv_layer(conv_b4b, 64, 3, 1, norm = 'none', leaky = leaky)
+        conv2 = _conv_layer(conv_b3, 64, 3, 1, norm = 'none', leaky = leaky)
         conv3 = _conv_layer(conv2, 64, 3, 1, norm = 'none', leaky = leaky)
         tconv1 = _upscale(conv3, 64, 3, 2, upscale)
         enhanced = tf.nn.tanh(_conv_layer(tconv1, 3, 9, 1, relu = False, norm = 'none')) * 0.58 + 0.5
@@ -629,13 +629,9 @@ def _forward_features(input, dim, depth, num_heads, window_size, mlp_ratio, qkv_
     return net
 
 def _rstb(input, dim, depth, num_heads, window_size, mlp_ratio, qkv_bias, qk_scale, patch_size, img_ch, x_size):
-    print(input.get_shape())
     net = _swin_transformer_layer(input, dim, depth, num_heads, window_size, mlp_ratio, qkv_bias, qk_scale, x_size)
-    print(net.get_shape())
     net = _patch_unembed(net, x_size, img_ch)
-    print(net.get_shape())
     net = _conv_layer(net, dim//2, 3, 1, relu=False)
-    print(net.get_shape())
     net = _patch_embed(net, patch_size, dim, False) + input
     return net
 
