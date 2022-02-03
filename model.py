@@ -76,7 +76,7 @@ def swinir_g(input_image, leaky = True, norm = 'instance', flat = 0, mix_input=F
         # conv_b2a = _conv_layer(conv_b1b, 64, 3, 1, norm = norm, leaky = leaky)
         # conv_b2b = _conv_layer(conv_b2a, 64, 3, 1, norm = norm, leaky = leaky) + conv_b1b
 
-        conv_b3 = _forward_features(conv_1, dim=64, depth=4, num_heads=4, window_size=8, mlp_ratio=2, qkv_bias=True, qk_scale=False, patch_size=1, num_rstb=3)
+        conv_b3 = _forward_features(conv1, dim=64, depth=4, num_heads=4, window_size=8, mlp_ratio=2, qkv_bias=True, qk_scale=False, patch_size=1, num_rstb=3)
         
         # conv_b4a = _conv_layer(conv_b3, 64, 3, 1, norm = norm, leaky = leaky)
         # conv_b4b = _conv_layer(conv_b4a, 64, 3, 1, norm = norm, leaky = leaky) + conv_b3
