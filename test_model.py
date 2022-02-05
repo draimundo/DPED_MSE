@@ -9,20 +9,21 @@ import sys
 import os
 import rawpy
 
-from model import dped_g, resnext_g, swinir_g
-import utils
+from model import switch_model
 
 from tqdm import tqdm
 from datetime import datetime
 from load_dataset import extract_bayer_channels
 
-dataset_dir, test_dir, model_dir, result_dir,\
-    dslr_dir, phone_dir, over_dir, under_dir, triple_exposure, up_exposure, down_exposure,\
-    arch, level, norm_gen, num_maps_base, flat, orig_model, rand_param, restore_iter,\
-    leaky, mix_input, onebyone, model_type, upscale,\
-    img_h, img_w, use_gpu, save_model, test_image = utils.process_test_model_args(sys.argv)
+import utils
 
-DSLR_SCALE = float(1) / (2 ** (max(level,0) - 1))
+dataset_dir, result_dir, vgg_dir, dslr_dir, phone_dir, model_dir, over_dir, under_dir,\
+    triple_exposure, up_exposure, down_exposure, restore_iter, img_h, img_w,\
+    activation, end_activation, norm_gen, flat, mix_input, onebyone, model_type, upscale,\
+    num_feats, num_blocks, use_gpu = utils.process_test_model_args(sys.argv)
+
+LEVEL = 0
+DSLR_SCALE = float(1) / (2 ** (max(LEVEL,0) - 1))
 MAX_SCALE = float(1) / (2 ** (5 - 1))
 IMAGE_HEIGHT, IMAGE_WIDTH = 3000, 4000
 TARGET_DEPTH = 3
@@ -67,14 +68,7 @@ with tf.compat.v1.Session(config=config) as sess:
 
     # generate enhanced image
     # Get the processed enhanced image
-    if model_type == 'resnext':
-        enhanced = resnext_g(x_, leaky = leaky, norm = norm_gen, flat = flat, mix_input = mix_input, onebyone = onebyone, upscale = upscale)
-    elif model_type == 'dped':
-        enhanced = dped_g(x_, leaky = leaky, norm = norm_gen, flat = flat, mix_input = mix_input, onebyone = onebyone, upscale = upscale)
-    elif model_type == 'swinir':
-        enhanced = swinir_g(x_, leaky = leaky, norm = norm_gen, flat = flat, mix_input = mix_input, onebyone = onebyone, upscale = upscale)
-    else:
-        raise NotImplementedError("Missing model " + model_type)
+    enhanced = switch_model(x_, model_type, activation, norm_gen, flat, mix_input, onebyone, upscale, end_activation, num_feats, num_blocks)
 
 
     # Determine model weights

@@ -3,13 +3,12 @@
 ##################################################
 
 import tensorflow as tf
-import imageio
 import numpy as np
 import sys
 from datetime import datetime
 
 from load_dataset import load_train_patch, load_val_data
-from model import dped_g, resnext_g, fourier_d, swinir_g, texture_d, unet_d
+from model import switch_model, fourier_d, texture_d, unet_d
 import utils
 import vgg
 import lpips_tf
@@ -26,8 +25,8 @@ from RAdam import RAdamOptimizer
 dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir, restore_iter,\
 triple_exposure, up_exposure, down_exposure, over_dir, under_dir,\
 patch_w, patch_h, batch_size, train_size, learning_rate, eval_step, num_train_iters, \
-save_mid_imgs, leaky, norm_gen, norm_disc, flat, percentage, entropy, mix, optimizer,\
-mix_input, onebyone, model_type, upscale,\
+norm_gen, norm_disc, flat, percentage, entropy, mix, optimizer,\
+mix_input, onebyone, model_type, upscale, activation, end_activation, num_feats, num_blocks,\
 fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips, fac_huber, fac_unet \
     = utils.process_command_args(sys.argv)
 
@@ -42,7 +41,6 @@ if triple_exposure:
     PATCH_DEPTH *= 3
 elif up_exposure or down_exposure:
     PATCH_DEPTH *= 2
-
 
 PATCH_WIDTH = patch_w//FAC_PATCH
 PATCH_HEIGHT = patch_h//FAC_PATCH
@@ -67,14 +65,7 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     dslr_ = tf.compat.v1.placeholder(tf.float32, [batch_size, TARGET_HEIGHT, TARGET_WIDTH, TARGET_DEPTH])
 
     # Get the processed enhanced image
-    if model_type == 'resnext':
-        enhanced = resnext_g(phone_, leaky = leaky, norm = norm_gen, flat = flat, mix_input = mix_input, onebyone = onebyone, upscale = upscale)
-    elif model_type == 'dped':
-        enhanced = dped_g(phone_, leaky = leaky, norm = norm_gen, flat = flat, mix_input = mix_input, onebyone = onebyone, upscale = upscale)
-    elif model_type == 'swinir':
-        enhanced = swinir_g(phone_, leaky = leaky, norm = norm_gen, flat = flat, mix_input = mix_input, onebyone = onebyone, upscale = upscale)
-    else:
-        raise NotImplementedError("Missing model " + model_type)
+    enhanced = switch_model(phone_, model_type, activation, norm_gen, flat, mix_input, onebyone, upscale, end_activation, num_feats, num_blocks)
 
     print("Num variables:" + str(np.sum([np.prod(v.get_shape().as_list()) for v in tf.compat.v1.trainable_variables()])))
     # Losses
@@ -296,11 +287,6 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
     VAL_SIZE = val_data.shape[0]
     num_val_batches = int(val_data.shape[0] / batch_size)
 
-    if save_mid_imgs:
-        visual_crops_ids = np.random.randint(0, VAL_SIZE, batch_size)
-        visual_val_crops = val_data[visual_crops_ids, :]
-        visual_target_crops = val_answ[visual_crops_ids, :]
-
     print("Training network...")
 
     iter_start = restore_iter+1 if restore_iter > 0 else 0
@@ -418,19 +404,6 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
             logs.write(logs_gen)
             logs.write('\n')
             logs.close()
-
-            # Optional: save visual results for several validation image crops
-            if save_mid_imgs:
-                enhanced_crops = sess.run(enhanced, feed_dict={phone_: visual_val_crops, dslr_: dslr_images})
-
-                idx = 0
-                for crop in enhanced_crops:
-                    if idx < 4:
-                        before_after = np.hstack((crop,
-                                        np.reshape(visual_target_crops[idx], [TARGET_HEIGHT, TARGET_WIDTH, TARGET_DEPTH])))
-                        imageio.imwrite(result_dir + "DPED_img_" + str(idx) + ".jpg",
-                                        before_after)
-                    idx += 1
 
             # Saving the model that corresponds to the current iteration
             saver.save(sess, model_dir + "DPED_iteration_" + str(i) + ".ckpt", write_meta_graph=False)

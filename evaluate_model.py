@@ -6,7 +6,7 @@ from tensorflow.python.ops.gen_math_ops import square
 from tqdm import tqdm
 
 from load_dataset import load_test_data
-from model import dped_g, resnext_g, swinir_g
+from model import switch_model
 import utils
 import vgg
 import os
@@ -15,11 +15,10 @@ import sys
 import niqe
 import lpips_tf
 
-dataset_dir, test_dir, model_dir, result_dir,\
-    dslr_dir, phone_dir, over_dir, under_dir, triple_exposure, up_exposure, down_exposure,\
-    arch, level, norm_gen, num_maps_base, flat, orig_model, rand_param, restore_iter,\
-    leaky, mix_input, onebyone, model_type, upscale,\
-    img_h, img_w, use_gpu, save_model, test_image = utils.process_test_model_args(sys.argv)
+dataset_dir, result_dir, vgg_dir, dslr_dir, phone_dir, model_dir, over_dir, under_dir,\
+        triple_exposure, up_exposure, down_exposure, restore_iter, img_h, img_w,\
+        activation, end_activation, norm_gen, flat, mix_input, onebyone, model_type, upscale,\
+        num_feats, num_blocks, use_gpu = utils.process_test_model_args(sys.argv)
 
 if flat:
     FAC_PATCH = 1
@@ -50,7 +49,6 @@ if restore_iter == 0:
 else:
     restore_iters = [restore_iter]
 batch_size = 10
-use_gpu = True
 
 print("Loading testing data...")
 test_data, test_answ = load_test_data(dataset_dir, dslr_dir, phone_dir, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, triple_exposure, over_dir, under_dir, up_exposure, down_exposure, flat)
@@ -67,14 +65,7 @@ with tf.compat.v1.Session(config=config) as sess:
     dslr_ = tf.compat.v1.placeholder(tf.float32, [batch_size, TARGET_HEIGHT, TARGET_WIDTH, TARGET_DEPTH])
 
     # Get the processed enhanced image
-    if model_type == 'resnext':
-        enhanced = resnext_g(phone_, leaky = leaky, norm = norm_gen, flat = flat, mix_input = mix_input, onebyone = onebyone, upscale = upscale)
-    elif model_type == 'dped':
-        enhanced = dped_g(phone_, leaky = leaky, norm = norm_gen, flat = flat, mix_input = mix_input, onebyone = onebyone, upscale = upscale)
-    elif model_type == 'swinir':
-        enhanced = swinir_g(phone_, leaky = leaky, norm = norm_gen, flat = flat, mix_input = mix_input, onebyone = onebyone, upscale = upscale)
-    else:
-        raise NotImplementedError("Missing model " + model_type)
+    enhanced = switch_model(phone_, model_type, activation, norm_gen, flat, mix_input, onebyone, upscale, end_activation, num_feats, num_blocks)
 
     saver = tf.compat.v1.train.Saver()
 
