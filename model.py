@@ -47,6 +47,20 @@ def dped_g(input_image, activation='lrelu', norm='instance', flat=0, mix_input=F
 
     return enhanced
 
+
+def tripledped_g(input_image, activation='lrelu', norm='instance', flat=0, mix_input=False, onebyone=False, upscale='transpose', end_activation='tanh', num_feat=64, num_blocks=4):
+    x_a, x_b, x_c = tf.split(input_image, 3, axis=-1)
+
+    enhanced_a = dped_g(x_a, activation=activation, norm=norm, flat=flat, mix_input=mix_input, onebyone=onebyone, upscale=upscale, end_activation=end_activation, num_feat=num_feat, num_blocks=num_blocks)
+    enhanced_b = dped_g(x_b, activation=activation, norm=norm, flat=flat, mix_input=mix_input, onebyone=onebyone, upscale=upscale, end_activation=end_activation, num_feat=num_feat, num_blocks=num_blocks)
+    enhanced_c = dped_g(x_c, activation=activation, norm=norm, flat=flat, mix_input=mix_input, onebyone=onebyone, upscale=upscale, end_activation=end_activation, num_feat=num_feat, num_blocks=num_blocks)
+
+    x = tf.concat([enhanced_a, enhanced_b, enhanced_c], axis = -1)
+
+    enhanced = dped_g(x, activation=activation, norm=norm, flat=flat, mix_input=mix_input, onebyone=onebyone, upscale=upscale, end_activation=end_activation, num_feat=num_feat, num_blocks=num_blocks)
+
+    return enhanced
+
 def resnext_g(input_image, activation='lrelu', norm='instance', flat=0, mix_input=False, onebyone=False, upscale='transpose', end_activation='tanh', num_feat=64, num_blocks=4):
     with tf.compat.v1.variable_scope("generator"):
         conv1 = _conv_layer(input_image, num_feat, 4, 2, norm = 'none', activation=activation)
@@ -65,18 +79,18 @@ def resnext_g(input_image, activation='lrelu', norm='instance', flat=0, mix_inpu
     return enhanced
 
 
-def dlsr_g(input_image, activation='lrelu', norm='instance', flat=0, mix_input=False, onebyone=False, upscale='transpose', end_activation='tanh', num_feat=64, num_blocks=4):
+def dlsr_g(input_image, activation='lrelu', norm='none', flat=0, mix_input=False, onebyone=False, upscale='transpose', end_activation='tanh', num_feat=64, num_blocks=4):
     with tf.compat.v1.variable_scope("generator"):
-        conv0 = _conv_layer(input_image, num_feat, 4, 2, norm='none', activation=activation)
-        conv_a = _conv_layer(conv0, num_feat, 1, 1, norm='none', activation=activation)
+        conv0 = _conv_layer(input_image, num_feat, 4, 2, norm=norm, activation=activation)
+        conv_a = _conv_layer(conv0, num_feat, 1, 1, norm=norm, activation=activation)
 
         conv_b = conv_a
         for i in range(num_blocks):
             conv_b = _convnext(conv_b)
 
-        conv2 = _conv_layer(conv_b, num_feat, 3, 1, norm='none', activation=activation) + conv_a
+        conv2 = _conv_layer(conv_b, num_feat, 3, 1, norm=norm, activation=activation) + conv_a
         tconv1 = _upscale(conv2, num_feat, 3, 2, upscale)
-        conv3 = _conv_layer(tconv1, num_feat, 3, 1, norm='none', activation=activation)
+        conv3 = _conv_layer(tconv1, num_feat, 3, 1, norm=norm, activation=activation)
 
         enhanced = _conv_layer(conv3, 3, 9, 1, norm='none', activation=end_activation)
     return enhanced
@@ -113,6 +127,8 @@ def switch_model(input_image, name, activation='lrelu', norm='instance', flat=0,
         return dlsr_g(input_image=input_image, activation=activation, norm=norm, flat=flat, mix_input=mix_input, onebyone=onebyone, upscale=upscale, end_activation=end_activation, num_feat=num_feat, num_blocks=num_blocks)
     elif name =='swinir':
         return swinir_g(input_image=input_image, activation=activation, norm=norm, flat=flat, mix_input=mix_input, onebyone=onebyone, upscale=upscale, end_activation=end_activation, num_feat=num_feat, num_blocks=num_blocks)
+    elif name =='tripledped':
+        return tripledped_g(input_image=input_image, activation=activation, norm=norm, flat=flat, mix_input=mix_input, onebyone=onebyone, upscale=upscale, end_activation=end_activation, num_feat=num_feat, num_blocks=num_blocks)
     else:
         Raise(NotImplementedError("Couldn't find model: " + name))
 
@@ -151,7 +167,7 @@ def _upscale(net, num_filters, filter_size, factor, method, activation='lrelu'):
     elif method == "shuffle":
         return _conv_pixel_shuffle_up(net, num_filters, filter_size, factor, activation)
     elif method == "dcl":
-        return _pixel_dcl(net, num_filters, filter_size, activation)
+        return _pixel_dcl(net, num_filters, filter_size, activation=activation)
     elif method == "resnet":
         return _resblock_up(net, num_filters, sn=True, activation=activation)
     elif method == "nn":
@@ -307,6 +323,7 @@ def _extract_colors(input):
 
 def _stack(x, y):
     return tf.concat([x, y], 3)
+
 
 def bias_variable(shape, name):
     initial = tf.constant(0.01, shape=shape)
