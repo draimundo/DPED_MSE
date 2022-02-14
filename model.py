@@ -48,6 +48,39 @@ def dped_g(input_image, activation='lrelu', norm='instance', flat=0, mix_input=F
     return enhanced
 
 
+def dpedatt_g(input_image, activation='lrelu', norm='instance', flat=0, mix_input=False, onebyone=False, upscale='transpose', end_activation='tanh', num_feat=64, num_blocks=4):
+    with tf.compat.v1.variable_scope("generator"):
+        conv1 = _conv_layer(input_image, num_feat, flat, 2, norm = 'none', activation=activation)
+        conv1 = _conv_layer(conv1, num_feat, 1, 1, norm = 'none', activation=activation)
+
+        conv_b1att = _attention(conv1)
+        conv_b1a = _conv_layer(conv1, num_feat, 3, 1, norm = norm, activation=activation)
+        conv_b1b = _conv_layer(conv_b1a, num_feat, 3, 1, norm = norm, activation=activation)
+        conv_b1 = conv_b1att * conv_b1b + conv1
+
+        conv_b2att = _attention(conv_b1)
+        conv_b2a = _conv_layer(conv_b1, num_feat, 3, 1, norm = norm, activation=activation)
+        conv_b2b = _conv_layer(conv_b2a, num_feat, 3, 1, norm = norm, activation=activation)
+        conv_b2 = conv_b2att * conv_b2b + conv_b1
+
+        conv_b3att = _attention(conv_b2)
+        conv_b3a = _conv_layer(conv_b2, num_feat, 3, 1, norm = norm, activation=activation)
+        conv_b3b = _conv_layer(conv_b3a, num_feat, 3, 1, norm = norm, activation=activation) + conv_b2b
+        conv_b3 = conv_b3att * conv_b3b + conv_b2
+
+        conv_b4att = _attention(conv_b3)
+        conv_b4a = _conv_layer(conv_b3b, num_feat, 3, 1, norm = norm, activation=activation)
+        conv_b4b = _conv_layer(conv_b4a, num_feat, 3, 1, norm = norm, activation=activation) + conv_b3b
+        conv_b4 = conv_b4att * conv_b4b + conv_b3
+
+        conv2 = _conv_layer(conv_b4, num_feat, 3, 1, norm = 'none', activation=activation)
+        conv3 = _conv_layer(conv2, num_feat, 3, 1, norm = 'none', activation=activation)
+        tconv1 = _upscale(conv3, num_feat, 3, 2, upscale)
+        enhanced = _conv_layer(tconv1, 3, 9, 1, norm='none', activation=end_activation)
+
+    return enhanced
+
+
 def tripledped_g(input_image, activation='lrelu', norm='instance', flat=0, mix_input=False, onebyone=False, upscale='transpose', end_activation='tanh', num_feat=64, num_blocks=4):
     x_a, x_b, x_c = tf.split(input_image, 3, axis=-1)
 
@@ -129,6 +162,8 @@ def switch_model(input_image, name, activation='lrelu', norm='instance', flat=0,
         return swinir_g(input_image=input_image, activation=activation, norm=norm, flat=flat, mix_input=mix_input, onebyone=onebyone, upscale=upscale, end_activation=end_activation, num_feat=num_feat, num_blocks=num_blocks)
     elif name =='tripledped':
         return tripledped_g(input_image=input_image, activation=activation, norm=norm, flat=flat, mix_input=mix_input, onebyone=onebyone, upscale=upscale, end_activation=end_activation, num_feat=num_feat, num_blocks=num_blocks)
+    elif name =='dpedatt':
+        return dpedatt_g(input_image=input_image, activation=activation, norm=norm, flat=flat, mix_input=mix_input, onebyone=onebyone, upscale=upscale, end_activation=end_activation, num_feat=num_feat, num_blocks=num_blocks)
     else:
         Raise(NotImplementedError("Couldn't find model: " + name))
 
@@ -156,6 +191,15 @@ def _switch_activation(x, activation='none'):
     else:
         print("Activation not recognized, using none")
         return x
+
+def _attention(net):
+    batch, rows, cols, channels = [i for i in net.get_shape()]
+    net = _conv_layer(net, channels, 3, 3, activation='lrelu')
+    net = _conv_layer(net, channels, 3, 3, activation='lrelu')
+    net = _conv_layer(net, channels, 3, 3, activation='lrelu')
+
+    batch, rows, cols, channels = [i for i in net.get_shape()]
+    return tf.nn.avg_pool(net, ksize=[1, rows, cols, 1], strides=[1,1,1,1], padding='VALID')
 
 
 def _gelu(x):
