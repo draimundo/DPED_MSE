@@ -249,6 +249,7 @@ def process_command_args(arguments):
 
     print("Flat: " + str(flat))
     print("Training data pecentage: " + str(percentage))
+    print("Sort training images by psnr: " + psnr)
     print("Sort training images by entropy: " + entropy)
     print("Mixing number of images: " + str(mix))
 
