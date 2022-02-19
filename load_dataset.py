@@ -273,7 +273,7 @@ def load_test_data_exp(dataset_dir, dslr_dir, phone_dir, over_dir, under_dir, PA
     return test_data, test_answ
 
 
-def load_train_patch(dataset_dir, dslr_dir, phone_dir, TRAIN_SIZE, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, triple_exposure, over_dir, under_dir, up_exposure = False, down_exposure = False, flat=False, percentage=100, entropy='no', mix=0):
+def load_train_patch(dataset_dir, dslr_dir, phone_dir, TRAIN_SIZE, PATCH_WIDTH, PATCH_HEIGHT, DSLR_SCALE, triple_exposure, over_dir, under_dir, up_exposure = False, down_exposure = False, flat=False, percentage=100, entropy='no', psnr='no', mix=0):
     if percentage > 100:
         percentage = 100
 
@@ -302,11 +302,15 @@ def load_train_patch(dataset_dir, dslr_dir, phone_dir, TRAIN_SIZE, PATCH_WIDTH, 
     if entropy == 'high':
         entropyList = pickle.load(file=open("entropyList.p", "rb"))
         TRAIN_IMAGES = np.random.choice(entropyList[int((100-percentage)*NUM_TRAINING_IMAGES/100):-1], TRAIN_SIZE, replace=False)
-
     elif entropy == 'low':
         entropyList = pickle.load(file=open("entropyList.p", "rb"))
         TRAIN_IMAGES = np.random.choice(entropyList[0:int(percentage*NUM_TRAINING_IMAGES/100)], TRAIN_SIZE, replace=False)
-
+    elif psnr == 'high':
+        psnrList = pickle.load(file=open("psnrList.p", "rb"))
+        TRAIN_IMAGES = np.random.choice(psnrList[int((100-percentage)*NUM_TRAINING_IMAGES/100):-1], TRAIN_SIZE, replace=False)
+    elif psnr =='low':
+        psnrList = pickle.load(file=open("psnrList.p", "rb"))
+        TRAIN_IMAGES = np.random.choice(psnrList[0:int(percentage*NUM_TRAINING_IMAGES/100)], TRAIN_SIZE, replace=False)
     else:
         TRAIN_IMAGES = np.random.choice(np.arange(0, int(percentage*NUM_TRAINING_IMAGES/100)), TRAIN_SIZE, replace=False)
 

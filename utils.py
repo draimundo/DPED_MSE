@@ -51,6 +51,7 @@ def process_command_args(arguments):
     flat = 4
     percentage = 100
     entropy='no'
+    psnr='no'
     mix = 0
     
     mix_input = False
@@ -142,6 +143,8 @@ def process_command_args(arguments):
             percentage = int(args.split("=")[1])
         if args.startswith("entropy"):
             entropy = args.split("=")[1]
+        if args.startswith("psnr"):
+            psnr = args.split("=")[1]
         # if args.startswith("mix"):
         #     mix = int(args.split("=")[1])
 
@@ -274,7 +277,7 @@ def process_command_args(arguments):
     return dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir, restore_iter,\
         triple_exposure, up_exposure, down_exposure, over_dir, under_dir,\
         patch_w, patch_h, batch_size, train_size, learning_rate, eval_step, num_train_iters, \
-        norm_gen, norm_disc, flat, percentage, entropy, mix, optimizer,\
+        norm_gen, norm_disc, flat, percentage, entropy, psnr, mix, optimizer,\
         mix_input, onebyone, model_type, upscale, activation, end_activation, num_feats, num_blocks,\
         fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips, fac_huber, fac_unet
 
