@@ -531,12 +531,10 @@ def _layer_norm(net):
     if len(net.get_shape()) == 4:
         batch, rows, cols, channels = [i for i in net.get_shape()]
         axes = [1,2,3]
-        perm = [3,1,2,0]
     elif len(net.get_shape()) == 3:
         batch, vals, channels = [i for i in net.get_shape()]
         axes = [1,2]
-        perm = [2,1,0]
-    var_shape = [batch]
+    var_shape = [1,1,1,1]
 
     mu, sigma_sq = tf.compat.v1.nn.moments(net, axes, keepdims=True)
     shift = tf.Variable(tf.zeros(var_shape))
@@ -545,10 +543,7 @@ def _layer_norm(net):
     epsilon = 1e-3
     normalized = (net-mu)/(sigma_sq + epsilon)**(.5)
 
-    ret = scale*tf.transpose(normalized, perm=perm) + shift
-    ret = tf.transpose(ret, perm=perm)
-
-    return ret
+    return scale * normalized + shift
 
 
 def _fully_connected_layer(net, num_weights, bias = True, activation='none'):
