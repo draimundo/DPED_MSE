@@ -27,7 +27,7 @@ triple_exposure, up_exposure, down_exposure, over_dir, under_dir,\
 patch_w, patch_h, batch_size, train_size, learning_rate, eval_step, num_train_iters, \
 norm_gen, norm_disc, flat, percentage, entropy, psnr, mix, optimizer,\
 mix_input, onebyone, model_type, upscale, activation, end_activation, num_feats, num_blocks,\
-fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips, fac_huber, fac_unet \
+fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips, fac_huber, fac_unet, fac_charbonnier \
     = utils.process_command_args(sys.argv)
 
 # Defining the size of the input and target image patches
@@ -84,6 +84,13 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
         loss_list.append(loss_l1)
         loss_text.append("loss_l1")
         loss_generator += loss_l1 * fac_l1
+
+    eps = 1e-6
+    loss_charbonnier = tf.reduce_mean(tf.sqrt(tf.math.squared_difference(enhanced, dslr_) + eps))
+    if fac_charbonnier > 0:
+        loss_list.append(loss_charbonnier)
+        loss_text.append("loss_charbonnier")
+        loss_generator += loss_charbonnier * fac_charbonnier
 
     # PSNR metric
     metric_psnr = tf.reduce_mean(tf.image.psnr(enhanced, dslr_, 1.0))

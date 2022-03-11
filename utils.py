@@ -77,6 +77,7 @@ def process_command_args(arguments):
     fac_lpips = 0
     fac_huber = 0
     fac_unet = 0
+    fac_charbonnier = 0
 
     for args in arguments:
         # --- data path ---
@@ -201,6 +202,9 @@ def process_command_args(arguments):
         if args.startswith("fac_unet"):
             fac_unet = float(args.split("=")[1])
             default_facs = False
+        if args.startswith("fac_charbonnier"):
+            fac_charbonnier = float(args.split("=")[1])
+            default_facs = False
 
     if default_facs:
         fac_vgg = 0.5
@@ -274,13 +278,14 @@ def process_command_args(arguments):
         " frequency:" + str(fac_frequency) +
         " lpips:" + str(fac_lpips) +
         " huber:" + str(fac_huber) +
-        " unet:" + str(fac_unet) )
+        " unet:" + str(fac_unet) +
+        " charbonnier:" + str(fac_charbonnier))
     return dataset_dir, model_dir, result_dir, vgg_dir, dslr_dir, phone_dir, restore_iter,\
         triple_exposure, up_exposure, down_exposure, over_dir, under_dir,\
         patch_w, patch_h, batch_size, train_size, learning_rate, eval_step, num_train_iters, \
         norm_gen, norm_disc, flat, percentage, entropy, psnr, mix, optimizer,\
         mix_input, onebyone, model_type, upscale, activation, end_activation, num_feats, num_blocks,\
-        fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips, fac_huber, fac_unet
+        fac_mse, fac_l1, fac_ssim, fac_ms_ssim, fac_color, fac_vgg, fac_texture, fac_fourier, fac_frequency, fac_lpips, fac_huber, fac_unet, fac_charbonnier
 
 
 def process_test_model_args(arguments):

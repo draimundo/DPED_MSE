@@ -151,6 +151,29 @@ def swinir_g(input_image, activation='lrelu', norm='instance', flat=0, mix_input
 
     return enhanced
 
+def csanet_g(input_image, activation='relu', norm='instance', flat=0, mix_input=False, onebyone=False, upscale='transpose', end_activation='sigmoid', num_feat=64, num_blocks=4):
+    with tf.compat.v1.variable_scope("generator"):
+        print(input_image.shape)
+        x = _conv_layer(input_image, 64, 3, 2, activation=activation)
+        print(x.shape)
+        x = _conv_layer(x, 64, 3, 1, activation=activation)
+        
+        dam1 = _double_att(x, activation, end_activation)
+        dam1 = x + dam1
+
+        dam2 = _double_att(dam1, activation, end_activation)
+        dam2 = dam1 + dam2
+
+        y = _conv_layer(dam2, 64, 3, 1, activation=activation)
+        y = _stack(x, y)
+
+        z = _upscale(y, 64, 3, 2, upscale, activation=activation)
+        z = _conv_layer(z, 64, 3, 1, activation=activation)
+        z = tf.nn.depth_to_space(z, 2)
+        z = _conv_layer(z, 3, 3, 1, activation=activation)
+        out = _switch_activation(z, activation=end_activation)
+    return out
+
 def switch_model(input_image, name, activation='lrelu', norm='instance', flat=0, mix_input=False, onebyone=False, upscale='transpose', end_activation='tanh', num_feat=64, num_blocks=4):
     if name =='dped':
         return dped_g(input_image=input_image, activation=activation, norm=norm, flat=flat, mix_input=mix_input, onebyone=onebyone, upscale=upscale, end_activation=end_activation, num_feat=num_feat, num_blocks=num_blocks)
@@ -164,6 +187,8 @@ def switch_model(input_image, name, activation='lrelu', norm='instance', flat=0,
         return tripledped_g(input_image=input_image, activation=activation, norm=norm, flat=flat, mix_input=mix_input, onebyone=onebyone, upscale=upscale, end_activation=end_activation, num_feat=num_feat, num_blocks=num_blocks)
     elif name =='dpedatt':
         return dpedatt_g(input_image=input_image, activation=activation, norm=norm, flat=flat, mix_input=mix_input, onebyone=onebyone, upscale=upscale, end_activation=end_activation, num_feat=num_feat, num_blocks=num_blocks)
+    elif name =='csanet':
+        return csanet_g(input_image=input_image, activation=activation, norm=norm, flat=flat, mix_input=mix_input, onebyone=onebyone, upscale=upscale, end_activation=end_activation, num_feat=num_feat, num_blocks=num_blocks)
     else:
         Raise(NotImplementedError("Couldn't find model: " + name))
 
@@ -186,6 +211,8 @@ def _switch_activation(x, activation='none'):
         return _gelu(x)
     elif activation == 'tanh':
         return tf.nn.tanh(x) * 0.58 + 0.5
+    elif activation == 'sigmoid':
+        return tf.nn.sigmoid(x)
     elif activation == 'none':
         return x
     else:
@@ -364,6 +391,9 @@ def weight_variable(shape, name):
 
 def _extract_colors(input):
     return tf.nn.space_to_depth(input, 2)
+
+def _merge_colors(input):
+    return tf.nn.depth_to_space(input, 2)
 
 def _stack(x, y):
     return tf.concat([x, y], 3)
@@ -820,6 +850,36 @@ def window_partition(x, window_size):
     x = np.transpose(x, axes=[0, 1, 3, 2, 4, 5])
     windows = np.reshape(x, [-1, window_size, window_size, C])
     return windows
+
+def _double_att(input, activation='relu', end_activation='sigmoid'):
+    batch, rows, cols, channels = [i for i in input.get_shape()]
+
+    x = _conv_layer(input, channels, 3, 1, activation=activation)
+    x = _conv_layer(x, channels, 1, 1, activation=activation)
+
+    ca  = _channel_att(x, activation, end_activation)
+    sa = _spatial_att(x, end_activation)
+
+    x = _stack(ca, sa)
+    x = _conv_layer(input, channels, 3, 1, activation=activation)
+    return x
+
+def _spatial_att(input, end_activation='sigmoid'):
+    batch, rows, cols, channels = [i for i in input.get_shape()]
+
+    weights_init = _conv_init_vars(input, 1, 5)
+    strides_shape = [1, 1, 1, 1]
+    dilation_rate = [2, 2]
+    x = tf.nn.depthwise_conv2d(input, weights_init, strides_shape, padding='SAME', dilations=dilation_rate)
+    x = _switch_activation(x, end_activation)
+    return tf.math.multiply(x, input)
+
+def _channel_att(input, activation='relu', end_activation='sigmoid'):
+    batch, rows, cols, channels = [i for i in input.get_shape()]
+    x = tf.nn.avg_pool(input, ksize=[1, rows, cols, 1], strides=[1,1,1,1], padding='VALID')
+    x = _conv_layer(x, channels, 1, 1, activation=activation)
+    x = _conv_layer(x, channels, 1, 1, activation=end_activation)
+    return x * input
 
 if __name__ == "__main__":
     window_size = 8
