@@ -153,9 +153,7 @@ def swinir_g(input_image, activation='lrelu', norm='instance', flat=0, mix_input
 
 def csanet_g(input_image, activation='relu', norm='instance', flat=0, mix_input=False, onebyone=False, upscale='transpose', end_activation='sigmoid', num_feat=64, num_blocks=4):
     with tf.compat.v1.variable_scope("generator"):
-        print(input_image.shape)
         x = _conv_layer(input_image, 64, 3, 2, activation=activation)
-        print(x.shape)
         x = _conv_layer(x, 64, 3, 1, activation=activation)
         
         dam1 = _double_att(x, activation, end_activation)
@@ -851,17 +849,17 @@ def window_partition(x, window_size):
     windows = np.reshape(x, [-1, window_size, window_size, C])
     return windows
 
-def _double_att(input, activation='relu', end_activation='sigmoid'):
+def _double_att(input, activation='relu', end_activation='sigmoid', norm='none'):
     batch, rows, cols, channels = [i for i in input.get_shape()]
 
-    x = _conv_layer(input, channels, 3, 1, activation=activation)
-    x = _conv_layer(x, channels, 1, 1, activation=activation)
+    x = _conv_layer(input, channels, 3, 1, activation=activation, norm=norm)
+    x = _conv_layer(x, channels, 1, 1, activation=activation, norm=norm)
 
     ca  = _channel_att(x, activation, end_activation)
     sa = _spatial_att(x, end_activation)
 
     x = _stack(ca, sa)
-    x = _conv_layer(input, channels, 3, 1, activation=activation)
+    x = _conv_layer(x, channels, 3, 1, activation=activation, norm=norm)
     return x
 
 def _spatial_att(input, end_activation='sigmoid'):
