@@ -172,6 +172,29 @@ def csanet_g(input_image, activation='relu', norm='instance', flat=0, mix_input=
         out = _switch_activation(z, activation=end_activation)
     return out
 
+def flatnet_g(input_image, activation='relu', norm='instance', flat=0, mix_input=False, onebyone=False, upscale='transpose', end_activation='sigmoid', num_feat=64, num_blocks=4):
+    with tf.compat.v1.variable_scope("generator"):
+        x_a = _conv_layer(input_image, 64, 4, 2, activation=activation) # flat-> layers
+        x_b = _conv_layer(x_a, 64, 3, 2, activation=activation) # downscale
+        x_c = _conv_layer(x_b, 64, 3, 1, activation=activation) # first layer
+        
+        dam1 = _double_att(x_c, activation, end_activation)
+        dam1 = x_c + dam1
+
+        dam2 = _double_att(dam1, activation, end_activation)
+        dam2 = dam1 + dam2
+
+        y = _conv_layer(dam2, 64, 3, 1, activation=activation)
+        y = x_c + y
+
+        z = _upscale(y, 64, 3, 2, upscale, activation=activation)
+        z = _stack(x_b, z)
+        z = _conv_layer(z, 64, 3, 1, activation=activation)
+        z = tf.nn.depth_to_space(z, 2)
+        z = _conv_layer(z, 3, 3, 1, activation=activation)
+        out = _switch_activation(z, activation=end_activation)
+    return out
+
 def switch_model(input_image, name, activation='lrelu', norm='instance', flat=0, mix_input=False, onebyone=False, upscale='transpose', end_activation='tanh', num_feat=64, num_blocks=4):
     if name =='dped':
         return dped_g(input_image=input_image, activation=activation, norm=norm, flat=flat, mix_input=mix_input, onebyone=onebyone, upscale=upscale, end_activation=end_activation, num_feat=num_feat, num_blocks=num_blocks)
@@ -187,6 +210,8 @@ def switch_model(input_image, name, activation='lrelu', norm='instance', flat=0,
         return dpedatt_g(input_image=input_image, activation=activation, norm=norm, flat=flat, mix_input=mix_input, onebyone=onebyone, upscale=upscale, end_activation=end_activation, num_feat=num_feat, num_blocks=num_blocks)
     elif name =='csanet':
         return csanet_g(input_image=input_image, activation=activation, norm=norm, flat=flat, mix_input=mix_input, onebyone=onebyone, upscale=upscale, end_activation=end_activation, num_feat=num_feat, num_blocks=num_blocks)
+    elif name =='flatnet':
+        return flatnet_g(input_image=input_image, activation=activation, norm=norm, flat=flat, mix_input=mix_input, onebyone=onebyone, upscale=upscale, end_activation=end_activation, num_feat=num_feat, num_blocks=num_blocks)
     else:
         Raise(NotImplementedError("Couldn't find model: " + name))
 
