@@ -200,11 +200,9 @@ def flatnet_g(input_image, activation='relu', norm='instance', flat=0, mix_input
 
 def skipnet_g(input_image, activation='relu', norm='instance', flat=0, mix_input=False, onebyone=False, upscale='transpose', end_activation='sigmoid', num_feat=64, num_blocks=4):
     with tf.compat.v1.variable_scope("generator"):
-        if flat > 0:
-            x_a = _conv_layer(input_image, 64, 4, 2, activation=activation) # flat-> layers
-        else:
-            x_a = input_image
-        x_b = _conv_layer(x_a, 64, 3, 2, activation=activation) # downscale
+        x_a = _extract_colors(input_image) / (4 * 255.0)
+        print(x_a.shape)
+        x_b = _downscale(x_a, 64, 3, 2, upscale.split(',')[2], norm='none', sn=False, activation=activation) # downscale
         x_c = _conv_layer(x_b, 64, 3, 1, activation=activation) # first layer
         
         dam1 = _double_att(x_c, activation, end_activation)
@@ -214,12 +212,13 @@ def skipnet_g(input_image, activation='relu', norm='instance', flat=0, mix_input
         dam2 = dam1 + dam2
 
         y = _conv_layer(dam2, 64, 3, 1, activation=activation)
-        y = x_c + y
-
-        z = _upscale(y, 64, 3, 2, upscale, activation=activation)
-        z = _stack(x_a, z)
+        y = _stack(x_c, y)
+        print(y.shape)
+        z = _upscale(y, 64, 3, 2, upscale.split(',')[0], activation=activation)
+        print(z.shape)
         z = _conv_layer(z, 64, 3, 1, activation=activation)
-        z = _upscale(y, 64, 3, 2, upscale, activation=activation)
+        z = _upscale(z, 64, 3, 2, upscale.split(',')[1], activation=activation)
+        print(z.shape)
         z = _stack(input_image, z)
         z = _conv_layer(z, 3, 3, 1, activation=activation)
         out = _switch_activation(z, activation=end_activation)
@@ -295,15 +294,29 @@ def _upscale(net, num_filters, filter_size, factor, method, activation='lrelu'):
     elif method == "dcl":
         return _pixel_dcl(net, num_filters, filter_size, activation=activation)
     elif method == "resnet":
-        return _resblock_up(net, num_filters, sn=True, activation=activation)
+        return _resblock_up(net, num_filters, sn=False, activation=activation)
     elif method == "nn":
         return _nearest_neighbor(net, factor)
     elif method == "swinnn":
         return _swinnearest(net, num_filters, activation)
+    elif method == "d2s":
+        return tf.nn.depth_to_space(net, 2)
     else:
         print("Unrecognized upscaling method, using transpose")
         return _conv_tranpose_layer(net, num_filters, filter_size, factor, activation)
 
+
+def _downscale(net, num_filters, filter_size, factor, method, norm, sn, activation='lrelu', padding='SAME'):
+    if method == "maxpool":
+        return _max_pool(net, factor)
+    elif method == "shuffle":
+        return tf.nn.space_to_depth(net, factor)
+    elif method == "stride":
+        return _conv_layer(net, num_filters, filter_size, factor, norm=norm, padding=padding, activation=activation)
+    elif method == "resnet":
+        return _resblock_down(net, num_filters, sn=False, padding=padding, norm=norm, activation=activation)
+    else:
+        print("Unrecognized downscaling method")
 
 def texture_d(image_, activation=True):
     with tf.compat.v1.variable_scope("texture_d"):
@@ -369,13 +382,13 @@ def unet_d(input, activation=True, norm='instance'):
             out = tf.nn.softmax(out)
         return out
 
-def _resblock_down(input, num_filters, use_bias=True, sn=False, norm='instance'):
+def _resblock_down(input, num_filters, use_bias=True, sn=False, norm='instance', activation='lrelu'):
     x = _switch_norm(input, norm)
-    x = tf.compat.v1.nn.leaky_relu(x)
+    x = _switch_activation(x, activation)
     x = _conv_layer(x, num_filters, 3, 2, activation='none', use_bias=use_bias, sn=sn)
 
     x = _switch_norm(x, norm)
-    x = tf.compat.v1.nn.leaky_relu(x)
+    x = _switch_activation(x, activation)
     x = _conv_layer(x, num_filters, 3, 1, activation='none', use_bias=use_bias, sn=sn)
 
     input = _conv_layer(input, num_filters, 3, 2, activation='none', use_bias=use_bias, sn=sn)
