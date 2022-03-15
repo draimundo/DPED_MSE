@@ -198,7 +198,6 @@ def flatnet_g(input_image, activation='relu', norm='instance', flat=0, mix_input
 def skipnet_g(input_image, activation='relu', norm='instance', flat=0, mix_input=False, onebyone=False, upscale='transpose', end_activation='sigmoid', num_feat=64, num_blocks=4):
     with tf.compat.v1.variable_scope("generator"):
         x_a = _extract_colors(input_image) / (4 * 255.0)
-        print(x_a.shape)
         x_b = _downscale(x_a, 64, 3, 2, upscale.split(',')[2], norm='none', sn=False, activation=activation) # downscale
         x_c = _conv_layer(x_b, 64, 3, 1, activation=activation) # first layer
         
@@ -210,12 +209,9 @@ def skipnet_g(input_image, activation='relu', norm='instance', flat=0, mix_input
 
         y = _conv_layer(dam2, 64, 3, 1, activation=activation)
         y = _stack(x_c, y)
-        print(y.shape)
         z = _upscale(y, 64, 3, 2, upscale.split(',')[0], activation=activation)
-        print(z.shape)
         z = _conv_layer(z, 64, 3, 1, activation=activation)
         z = _upscale(z, 64, 3, 2, upscale.split(',')[1], activation=activation)
-        print(z.shape)
         z = _stack(input_image, z)
         z = _conv_layer(z, 3, 3, 1, activation=activation)
         out = _switch_activation(z, activation=end_activation)
@@ -309,7 +305,7 @@ def _upscale(net, num_filters, filter_size, factor, method, activation='lrelu'):
     elif method == "dcl":
         return _pixel_dcl(net, num_filters, filter_size, activation=activation)
     elif method == "resnet":
-        return _resblock_up(net, num_filters, sn=False, activation=activation)
+        return _resblock_up(net, num_filters, sn=False, norm='none', activation=activation)
     elif method == "nn":
         return _nearest_neighbor(net, factor)
     elif method == "swinnn":

@@ -348,14 +348,15 @@ with tf.Graph().as_default(), tf.compat.v1.Session() as sess:
         phone_g = train_data[idx_g]
         dslr_g = train_answ[idx_g]
 
-        for k in range(batch_size):
-            random_rotate = np.random.randint(1, 100) % 4
-            phone_g[k] = np.rot90(phone_g[k], random_rotate)
-            dslr_g[k] = np.rot90(dslr_g[k], random_rotate)
-            random_flip = np.random.randint(1, 100) % 2
-            if random_flip == 1:
-                phone_g[k] = np.flipud(phone_g[k])
-                dslr_g[k] = np.flipud(dslr_g[k])
+        if flat == 0: #only apply rotations on stacked input
+            for k in range(batch_size):
+                random_rotate = np.random.randint(1, 100) % 4
+                phone_g[k] = np.rot90(phone_g[k], random_rotate)
+                dslr_g[k] = np.rot90(dslr_g[k], random_rotate)
+                random_flip = np.random.randint(1, 100) % 2
+                if random_flip == 1:
+                    phone_g[k] = np.flipud(phone_g[k])
+                    dslr_g[k] = np.flipud(dslr_g[k])
 
         feed_g = {phone_: phone_g, dslr_: dslr_g}
         [loss_temp, temp] = sess.run([loss_generator, train_step_dped_g], feed_dict=feed_g)
