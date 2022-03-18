@@ -172,6 +172,30 @@ def csanet_g(input_image, activation='relu', norm='instance', flat=0, mix_input=
         out = _switch_activation(z, activation=end_activation)
     return out
 
+
+def lightnet_g(input_image, activation='relu', norm='instance', flat=0, mix_input=False, onebyone=False, upscale='transpose', end_activation='sigmoid', num_feat=64, num_blocks=4):
+    with tf.compat.v1.variable_scope("generator"):
+        x_a = _conv_layer(input_image, 16, 4, 2, activation=activation) # flat-> layers
+        x_b = _downscale(x_a, 16, 3, 2, 'stride', norm='none', sn=False, activation=activation) # downscale
+        x_c = _conv_layer(x_b, 16, 3, 1, activation=activation) # first layer
+        
+        dam1 = _double_att(x_c, activation, end_activation, reduction=4, multiplier=2)
+        dam1 = x_c + dam1
+
+        dam2 = _double_att(dam1, activation, end_activation, reduction=4, multiplier=2)
+        dam2 = dam1 + dam2
+
+        y = _conv_layer(dam2, 16, 3, 1, activation=activation)
+        y = _stack(x_c, y)
+
+        z = _upscale(y, 16, 3, 2, 'transpose', activation='none')
+        z = _conv_layer(z, 16, 3, 1, activation=activation)
+        z = _upscale(z, 64, 3, 2, 'd2s', activation=activation)
+        z = _conv_layer(z, 3, 3, 1, activation=activation)
+        out = _switch_activation(z, activation=end_activation)
+    return out
+
+
 def flatnet_g(input_image, activation='relu', norm='instance', flat=0, mix_input=False, onebyone=False, upscale='transpose', end_activation='sigmoid', num_feat=64, num_blocks=4):
     with tf.compat.v1.variable_scope("generator"):
 
@@ -254,6 +278,8 @@ def switch_model(input_image, name, activation='lrelu', norm='instance', flat=0,
         return skipnet_g(input_image=input_image, activation=activation, norm=norm, flat=flat, mix_input=mix_input, onebyone=onebyone, upscale=upscale, end_activation=end_activation, num_feat=num_feat, num_blocks=num_blocks)
     elif name =='testnet':
         return testnet_g(input_image=input_image, activation=activation, norm=norm, flat=flat, mix_input=mix_input, onebyone=onebyone, upscale=upscale, end_activation=end_activation, num_feat=num_feat, num_blocks=num_blocks)
+    elif name =='lightnet':
+        return lightnet_g(input_image=input_image, activation=activation, norm=norm, flat=flat, mix_input=mix_input, onebyone=onebyone, upscale=upscale, end_activation=end_activation, num_feat=num_feat, num_blocks=num_blocks)
     else:
         Raise(NotImplementedError("Couldn't find model: " + name))
 
@@ -930,17 +956,17 @@ def window_partition(x, window_size):
     windows = np.reshape(x, [-1, window_size, window_size, C])
     return windows
 
-def _double_att(input, activation='relu', end_activation='sigmoid', norm='none'):
+def _double_att(input, activation='relu', mid_activation='none', end_activation='sigmoid', norm='none', reduction=1, multiplier=1):
     batch, rows, cols, channels = [i for i in input.get_shape()]
 
-    x = _conv_layer(input, channels, 3, 1, activation=activation, norm=norm)
-    x = _conv_layer(x, channels, 1, 1, activation=activation, norm=norm)
+    x = _conv_layer(input, channels*multiplier, 3, 1, activation=activation, norm=norm)
+    x = _conv_layer(x, channels*multiplier, 1, 1, activation=mid_activation, norm=norm)
 
-    ca  = _channel_att(x, activation, end_activation)
+    ca  = _channel_att(x, activation, end_activation, reduction)
     sa = _spatial_att(x, end_activation)
 
     x = _stack(ca, sa)
-    x = _conv_layer(x, channels, 3, 1, activation=activation, norm=norm)
+    x = _conv_layer(x, channels, 3, 1, activation=mid_activation, norm=norm)
     return x
 
 def _spatial_att(input, end_activation='sigmoid'):
@@ -953,10 +979,10 @@ def _spatial_att(input, end_activation='sigmoid'):
     x = _switch_activation(x, end_activation)
     return tf.math.multiply(x, input)
 
-def _channel_att(input, activation='relu', end_activation='sigmoid'):
+def _channel_att(input, activation='relu', end_activation='sigmoid', reduction=1):
     batch, rows, cols, channels = [i for i in input.get_shape()]
     x = tf.nn.avg_pool(input, ksize=[1, rows, cols, 1], strides=[1,1,1,1], padding='VALID')
-    x = _conv_layer(x, channels, 1, 1, activation=activation)
+    x = _conv_layer(x, channels//reduction, 1, 1, activation=activation)
     x = _conv_layer(x, channels, 1, 1, activation=end_activation)
     return x * input
 
