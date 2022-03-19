@@ -217,12 +217,37 @@ def lightnet2_g(input_image, activation='relu', norm='instance', flat=0, mix_inp
         out = _switch_activation(z, activation=end_activation)
     return out
 
+def lightnet3_g(input_image, activation='relu', norm='instance', flat=0, mix_input=False, onebyone=False, upscale='transpose', end_activation='sigmoid', num_feat=64, num_blocks=4):
+    with tf.compat.v1.variable_scope("generator"):
+        x_a = _conv_layer(input_image, 16, 4, 2, activation=activation) # flat-> layers
+        x_b = _downscale(x_a, 16, 3, 2, 'stride', norm='none', sn=False, activation=activation) # downscale
+        x_c = _conv_layer(x_b, 16, 3, 1, activation=activation) # first layer
+        
+        dam1 = _double_att(x_c, activation, mid_activation='none', end_activation=end_activation, reduction=4, multiplier=2)
+        dam1 = x_c + dam1
+
+        dam2 = _double_att(dam1, activation, mid_activation='none', end_activation=end_activation, reduction=4, multiplier=2)
+        dam2 = dam1 + dam2
+
+        y = _conv_layer(dam2, 16, 3, 1, activation=activation)
+        y = x_c + y
+
+        z = _upscale(y, 16, 3, 2, 'transpose', activation='none')
+        z = _stack(x_a, z)
+        z = _conv_layer(z, 16, 3, 1, activation=activation)
+        z = _upscale(z, 64, 3, 2, 'd2s', activation=activation)
+        z = _conv_layer(z, 3, 3, 1, activation=activation)
+        out = _switch_activation(z, activation=end_activation)
+    return out
+
 
 def flatnet_g(input_image, activation='relu', norm='instance', flat=0, mix_input=False, onebyone=False, upscale='transpose', end_activation='sigmoid', num_feat=64, num_blocks=4):
     with tf.compat.v1.variable_scope("generator"):
-
-        x_a = _conv_layer(input_image, 64, 4, 2, activation=activation) # flat-> layers
-        x_b = _downscale(x_a, 64, 3, 2, upscale.split(',')[2], norm='none', sn=False, activation=activation) # downscale
+        if flat > 0:
+            x_a = _conv_layer(input_image, 64, 4, 2, activation=activation) # flat-> layers
+        else:
+            x_a = input_image
+        x_b = _conv_layer(x_a, 64, 3, 2, activation=activation) # downscale
         x_c = _conv_layer(x_b, 64, 3, 1, activation=activation) # first layer
         
         dam1 = _double_att(x_c, activation, end_activation)
@@ -234,9 +259,10 @@ def flatnet_g(input_image, activation='relu', norm='instance', flat=0, mix_input
         y = _conv_layer(dam2, 64, 3, 1, activation=activation)
         y = x_c + y
 
-        z = _upscale(y, 64, 3, 2, upscale.split(',')[0], activation=activation)
+        z = _upscale(y, 64, 3, 2, upscale, activation=activation)
+        z = _stack(x_a, z)
         z = _conv_layer(z, 64, 3, 1, activation=activation)
-        z = _upscale(z, 64, 3, 2, upscale.split(',')[1], activation=activation)
+        z = tf.nn.depth_to_space(z, 2)
         z = _conv_layer(z, 3, 3, 1, activation=activation)
         out = _switch_activation(z, activation=end_activation)
     return out
@@ -304,6 +330,8 @@ def switch_model(input_image, name, activation='lrelu', norm='instance', flat=0,
         return lightnet_g(input_image=input_image, activation=activation, norm=norm, flat=flat, mix_input=mix_input, onebyone=onebyone, upscale=upscale, end_activation=end_activation, num_feat=num_feat, num_blocks=num_blocks)
     elif name =='lightnet2':
         return lightnet2_g(input_image=input_image, activation=activation, norm=norm, flat=flat, mix_input=mix_input, onebyone=onebyone, upscale=upscale, end_activation=end_activation, num_feat=num_feat, num_blocks=num_blocks)
+    elif name =='lightnet3':
+        return lightnet3_g(input_image=input_image, activation=activation, norm=norm, flat=flat, mix_input=mix_input, onebyone=onebyone, upscale=upscale, end_activation=end_activation, num_feat=num_feat, num_blocks=num_blocks)
     else:
         Raise(NotImplementedError("Couldn't find model: " + name))
 
