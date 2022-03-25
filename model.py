@@ -332,6 +332,8 @@ def switch_model(input_image, name, activation='lrelu', norm='instance', flat=0,
         return lightnet2_g(input_image=input_image, activation=activation, norm=norm, flat=flat, mix_input=mix_input, onebyone=onebyone, upscale=upscale, end_activation=end_activation, num_feat=num_feat, num_blocks=num_blocks)
     elif name =='lightnet3':
         return lightnet3_g(input_image=input_image, activation=activation, norm=norm, flat=flat, mix_input=mix_input, onebyone=onebyone, upscale=upscale, end_activation=end_activation, num_feat=num_feat, num_blocks=num_blocks)
+    elif name =='csaorig':
+        return csanet(input=input_image)
     else:
         Raise(NotImplementedError("Couldn't find model: " + name))
 
