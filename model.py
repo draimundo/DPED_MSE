@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import numpy as np
 
+from CSAnet import csanet
 
 def dped_g(input_image, activation='lrelu', norm='instance', flat=0, mix_input=False, onebyone=False, upscale='transpose', end_activation='tanh', num_feat=64, num_blocks=4):
     with tf.compat.v1.variable_scope("generator"):
